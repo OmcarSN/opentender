@@ -86,6 +86,23 @@ async function main() {
   await (await openTender.connect(bidder1).commitBid(t2Id, hash1, { value: hre.ethers.parseEther("5") })).wait();
   console.log(`- Bidder 1 committed sealed bid on Tender #${t2Id}`);
 
+  // Pre-fund and grant roles to browser test account
+  const browserUser = "0x3276ddefd4a54e4ed3b3d59dcd829ce61d392f59";
+  try {
+    await hre.ethers.provider.send("hardhat_setBalance", [
+      browserUser,
+      "0x3635C9ADC5DEA00000", // 1000 ETH
+    ]);
+    const DEPARTMENT_ROLE = await openTender.DEPARTMENT_ROLE();
+    const VERIFIER_ROLE = await openTender.VERIFIER_ROLE();
+    await (await openTender.grantRole(DEPARTMENT_ROLE, browserUser)).wait();
+    await (await openTender.grantRole(VERIFIER_ROLE, browserUser)).wait();
+    await (await openTender.registerBidder(browserUser, hre.ethers.id("USER_BROWSER_ID"), hre.ethers.id("GROUP_ALPHA"))).wait();
+    console.log(`- Granted Department, Verifier, Bidder roles and 1,000 ETH to browser account: ${browserUser}`);
+  } catch (err) {
+    // Non-fatal if on public testnet
+  }
+
   console.log("\nSeed completed successfully!");
 }
 

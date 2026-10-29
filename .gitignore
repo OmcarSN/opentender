@@ -9,6 +9,8 @@ dashboard/.env.local
 dashboard/.env.production
 dashboard/.env.development
 !.env.example
+*.env
+dist/
 dashboard/dist/
 coverage/
 coverage.json

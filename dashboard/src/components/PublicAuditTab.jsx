@@ -29,9 +29,10 @@ export default function PublicAuditTab({
   events,
   signer,
   onSwitchToBidder,
-  searchQuery = ""
+  searchQuery = "",
+  latestBlockTimestamp = 0
 }) {
-  const [nowSec, setNowSec] = useState(Math.floor(Date.now() / 1000));
+  const [blockTimestamp, setBlockTimestamp] = useState(latestBlockTimestamp || 0);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [scaleFilter, setScaleFilter] = useState("all");
   const [searchFilter, setSearchFilter] = useState("");
@@ -47,17 +48,57 @@ export default function PublicAuditTab({
   const [attackLogs, setAttackLogs] = useState([]);
   const [isAttacking, setIsAttacking] = useState(false);
 
-  // Live countdown tick
+  // Sync latest on-chain block timestamp directly from blockchain provider
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNowSec(Math.floor(Date.now() / 1000));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    let isMounted = true;
+    async function fetchBlockTime() {
+      try {
+        if (contract && contract.runner && contract.runner.provider) {
+          const b = await contract.runner.provider.getBlock("latest");
+          if (b && isMounted) {
+            setBlockTimestamp(Number(b.timestamp));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchBlockTime();
+    const interval = setInterval(fetchBlockTime, 2000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [contract]);
 
+  useEffect(() => {
+    if (latestBlockTimestamp && latestBlockTimestamp > blockTimestamp) {
+      setBlockTimestamp(latestBlockTimestamp);
+    }
+  }, [latestBlockTimestamp]);
+
+  // Determine accurate sub-phase for tenders using block timestamp
+  function getTenderPhase(t) {
+    if (!t) return "None";
+    if (t.status !== 1) {
+      return STATUS_LABELS[t.status] || "Open";
+    }
+    if (blockTimestamp > 0) {
+      if (blockTimestamp <= Number(t.commitDeadline)) {
+        return "Commit Phase";
+      }
+      if (blockTimestamp <= Number(t.revealDeadline)) {
+        return "Reveal Phase";
+      }
+      return "Awaiting Finalization";
+    }
+    return "Commit Phase";
+  }
+
+  // Countdown formatted strictly against blockchain block timestamp
   function formatCountdown(targetSeconds) {
-    if (!targetSeconds) return "--";
-    const diff = targetSeconds - nowSec;
+    if (!targetSeconds || !blockTimestamp) return "--";
+    const diff = Number(targetSeconds) - blockTimestamp;
     if (diff <= 0) return "Elapsed";
     const h = Math.floor(diff / 3600);
     const m = Math.floor((diff % 3600) / 60);
@@ -148,8 +189,12 @@ export default function PublicAuditTab({
     setIsAttacking(false);
   }
 
-  const isPreReveal = timeline ? nowSec <= Number(timeline.revealDeadline) : true;
-  const statusNum = tenderDetails ? Number(tenderDetails.status) : 0;
+  const activeTender = tenders.find((t) => t.id === selectedTenderId) || tenderDetails;
+  const activePhaseTitle = getTenderPhase(activeTender);
+  const isPreReveal = activeTender
+    ? (blockTimestamp > 0 ? blockTimestamp <= Number(activeTender.revealDeadline) : true)
+    : (timeline && blockTimestamp > 0 ? blockTimestamp <= Number(timeline.revealDeadline) : true);
+  const statusNum = activeTender ? Number(activeTender.status) : (tenderDetails ? Number(tenderDetails.status) : 0);
   const activeMeta = selectedTenderId ? getTenderMeta(selectedTenderId) : null;
 
   return (
@@ -317,7 +362,7 @@ export default function PublicAuditTab({
                   <div className="card-thumb-wrapper">
                     <img src={meta.image} alt={meta.title} className="card-thumb-img" />
                     <span className="card-phase-overlay">
-                      {tender.status === 1 ? "COMMIT PHASE" : statusText.toUpperCase()}
+                      {getTenderPhase(tender).toUpperCase()}
                     </span>
                   </div>
 
@@ -345,7 +390,11 @@ export default function PublicAuditTab({
                     <div className="card-spec-row">
                       <span className="spec-icon">📅</span>
                       <span className="spec-text">
-                        Commit Closes: {new Date(Number(tender.commitDeadline) * 1000).toLocaleTimeString()} · Bond: {bondFormatted} {CURRENCY_SYMBOL}
+                        {getTenderPhase(tender) === "Commit Phase"
+                          ? `Commit Phase (closes in ${formatCountdown(tender.commitDeadline)}) · Bond: ${bondFormatted} ${CURRENCY_SYMBOL}`
+                          : getTenderPhase(tender) === "Reveal Phase"
+                          ? `Reveal Phase (closes in ${formatCountdown(tender.revealDeadline)}) · Bond: ${bondFormatted} ${CURRENCY_SYMBOL}`
+                          : `${getTenderPhase(tender)} · Bond: ${bondFormatted} ${CURRENCY_SYMBOL}`}
                       </span>
                     </div>
 
@@ -403,14 +452,26 @@ export default function PublicAuditTab({
               {/* Phase Banner */}
               <div className="modal-phase-banner">
                 <div>
-                  <div className="phase-badge-text">STATUS: {STATUS_LABELS[statusNum]}</div>
-                  <div className="phase-desc">{timeline?.currentPhase || "Commit Phase Active"}</div>
+                  <div className="phase-badge-text">STATUS: {activePhaseTitle.toUpperCase()}</div>
+                  <div className="phase-desc">
+                    Latest Block Time: {blockTimestamp ? new Date(blockTimestamp * 1000).toLocaleTimeString() : "Syncing..."}
+                  </div>
                 </div>
                 <div className="phase-clock-box">
-                  <span className="clock-label">Countdown:</span>
+                  <span className="clock-label">
+                    {activePhaseTitle === "Commit Phase"
+                      ? "Commit Phase Closes In:"
+                      : activePhaseTitle === "Reveal Phase"
+                      ? "Reveal Phase Closes In:"
+                      : "Phase Status:"}
+                  </span>
                   <span className="clock-digits">
-                    {statusNum === 1
-                      ? formatCountdown(Number(timeline?.commitDeadline))
+                    {activeTender && activeTender.status === 1
+                      ? (blockTimestamp <= Number(activeTender.commitDeadline)
+                          ? formatCountdown(Number(activeTender.commitDeadline))
+                          : blockTimestamp <= Number(activeTender.revealDeadline)
+                          ? formatCountdown(Number(activeTender.revealDeadline))
+                          : "Elapsed")
                       : STATUS_LABELS[statusNum]}
                   </span>
                 </div>
@@ -421,7 +482,7 @@ export default function PublicAuditTab({
                 <div className="section-title-row">
                   <h4>Cryptographic Bids Ledger</h4>
                   {isPreReveal && (
-                    <span className="badge-shield-mini">🔒 Zero-Knowledge Shield Active</span>
+                    <span className="badge-shield-mini">🔒 Sealed Bids, Hidden Until Reveal</span>
                   )}
                 </div>
 

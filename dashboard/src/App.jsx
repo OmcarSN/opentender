@@ -81,6 +81,7 @@ export default function App() {
   const [platformStats, setPlatformStats] = useState(null);
   const [events, setEvents] = useState([]);
   const [claimableBalance, setClaimableBalance] = useState(0n);
+  const [latestBlockTimestamp, setLatestBlockTimestamp] = useState(0);
 
   const [notification, setNotification] = useState({
     active: false,
@@ -94,6 +95,12 @@ export default function App() {
   const loadContractData = useCallback(async () => {
     try {
       const readContract = getReadOnlyContract();
+
+      // Latest on-chain block timestamp
+      const latestBlock = await readContract.runner.provider.getBlock("latest").catch(() => null);
+      if (latestBlock) {
+        setLatestBlockTimestamp(Number(latestBlock.timestamp));
+      }
 
       // Platform stats
       const stats = await readContract.getPlatformStats().catch(() => null);
@@ -267,6 +274,17 @@ export default function App() {
       setSigner(s);
       setChainId(Number(network.chainId));
 
+      if (Number(network.chainId) === 31337) {
+        try {
+          await browserProvider.send("hardhat_setBalance", [
+            addr,
+            "0x3635C9ADC5DEA00000", // 1,000 ETH
+          ]);
+        } catch {
+          // Ignore if provider doesn't support
+        }
+      }
+
       await checkAccountRoles(addr, s);
       await loadContractData();
     } catch (err) {
@@ -362,6 +380,7 @@ export default function App() {
               signer={signer}
               onSwitchToBidder={handleSwitchToBidder}
               searchQuery={searchQuery}
+              latestBlockTimestamp={latestBlockTimestamp}
             />
           )}
 

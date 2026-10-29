@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ethers } from "ethers";
-import { CURRENCY_SYMBOL } from "../config";
+import { CURRENCY_SYMBOL, getReadOnlyContract } from "../config";
 import { parseContractError } from "../utils/errors";
 
 export default function OfficerTab({
@@ -66,7 +66,8 @@ export default function OfficerTab({
     try {
       setNotification({ active: true, title: "Creating New Tender On-Chain..." });
 
-      const now = Math.floor(Date.now() / 1000);
+      const latestBlock = await signerContract.runner.provider.getBlock("latest").catch(() => null);
+      const now = latestBlock ? Number(latestBlock.timestamp) : Math.floor(Date.now() / 1000);
       const commitDeadline = now + parseInt(commitMins, 10) * 60;
       const revealDeadline = commitDeadline + parseInt(revealMins, 10) * 60;
       const escrowWindow = parseInt(escrowHours, 10) * 3600;
@@ -148,7 +149,7 @@ export default function OfficerTab({
     if (!signerContract) return;
     try {
       setNotification({ active: true, title: `Funding Escrow for Tender #${actionTenderId}...` });
-      const details = await signerContract.getTenderDetails(actionTenderId);
+      const details = await getReadOnlyContract().getTenderDetails(actionTenderId);
       const winningAmount = details.winningAmount;
 
       const tx = await signerContract.fundEscrow(actionTenderId, { value: winningAmount });
