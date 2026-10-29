@@ -47,19 +47,25 @@ export function parseContractError(error) {
   }
 
   // 2. Substring matching for error names in string representation
-  const errString = error.message || error.toString();
+  const errString = (error.message || error.toString() || "").toLowerCase();
   for (const [key, msg] of Object.entries(ERROR_TRANSLATIONS)) {
-    if (errString.includes(key)) {
+    if (errString.includes(key.toLowerCase())) {
       return msg;
     }
   }
 
-  if (errString.includes("user rejected") || errString.includes("ACTION_REJECTED")) {
-    return "Transaction cancelled by user in wallet.";
+  if (
+    errString.includes("user rejected") ||
+    errString.includes("action_rejected") ||
+    errString.includes("user denied") ||
+    error?.code === 4001 ||
+    error?.code === "ACTION_REJECTED"
+  ) {
+    return "Connection request was cancelled in your wallet.";
   }
 
   if (errString.includes("insufficient funds")) {
-    return "Insufficient funds in wallet for gas and transaction value.";
+    return "Insufficient balance in wallet for gas and transaction value.";
   }
 
   return error.reason || error.shortMessage || error.message || "Transaction reverted on-chain.";

@@ -286,7 +286,7 @@ export default function App() {
     const rawProvider = chosenProvider || activeWalletProvider || window.ethereum;
     if (!rawProvider) {
       setNotification({
-        active: true,
+        active: false,
         title: "No Wallet Detected",
         error: "Please install or unlock BridgeKey, MetaMask, or a compatible Web3 browser extension."
       });
@@ -325,7 +325,7 @@ export default function App() {
       await loadContractData();
       setShowWalletModal(false);
     } catch (err) {
-      setNotification({ active: true, title: "Connection Failed", error: parseContractError(err) });
+      setNotification({ active: false, title: "Connection Failed", error: parseContractError(err) });
     }
   }
 
