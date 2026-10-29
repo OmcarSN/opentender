@@ -1504,8 +1504,19 @@ code, pre {
 }
 
 .web3-wallet-icon-wrap.metamask-brand {
-  background: #181512;
-  border: 1px solid rgba(246, 133, 27, 0.3);
+  background: #000000;
+  border: 1px solid rgba(246, 133, 27, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metamask-fox-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 3px;
+  border-radius: 9px;
 }
 
 .web3-wallet-icon-wrap.coinbase-brand {
