@@ -44,9 +44,28 @@ export default function PublicAuditTab({
       return false;
     }
   });
-  const [showAttackModal, setShowAttackModal] = useState(false);
+  const [showAttackModal, setShowAttackModal] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("attack") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [attackLogs, setAttackLogs] = useState([]);
   const [isAttacking, setIsAttacking] = useState(false);
+
+  // If opened with ?attack=true, auto-run attack demo
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("attack") === "true") {
+        runAttackDemo();
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Sync latest on-chain block timestamp directly from blockchain provider
   useEffect(() => {

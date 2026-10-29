@@ -374,16 +374,28 @@ export default function OfficerTab({
                 />
               </div>
               <div className="form-group col-half">
-                <label>Daily Penalty (BPS: 200 = 2%/d)</label>
+                <label>Grace Period (Hours)</label>
                 <input
                   type="number"
-                  min="0"
-                  max="1000"
-                  value={penaltyBps}
-                  onChange={(e) => setPenaltyBps(e.target.value)}
+                  min="1"
+                  value={graceHours}
+                  onChange={(e) => setGraceHours(e.target.value)}
                   required
                 />
               </div>
+            </div>
+
+            <div className="form-group">
+              <label>Daily Penalty (BPS: 200 = 2%/day)</label>
+              <input
+                type="number"
+                min="0"
+                max="1000"
+                value={penaltyBps}
+                onChange={(e) => setPenaltyBps(e.target.value)}
+                required
+              />
+              <div className="field-hint">Late delivery penalty. 100 BPS = 1% per day. Max 1000 BPS (10%).</div>
             </div>
 
             <div className="form-group">
