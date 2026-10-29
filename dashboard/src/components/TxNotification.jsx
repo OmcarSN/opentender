@@ -12,8 +12,18 @@ export default function TxNotification({ notification, onDismiss }) {
     <div className={`tx-notification ${error ? "is-error" : success ? "is-success" : "is-pending"}`}>
       <div className="tx-icon">
         {active && <div className="spinner" />}
-        {success && <span>✅</span>}
-        {error && <span>⚠️</span>}
+        {success && (
+          <svg className="icon-success" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--emerald-light)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        )}
+        {error && (
+          <svg className="icon-error" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        )}
       </div>
 
       <div className="tx-content">

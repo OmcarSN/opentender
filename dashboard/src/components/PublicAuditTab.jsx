@@ -162,8 +162,8 @@ export default function PublicAuditTab({
 
     logs.push({
       step: 1,
-      title: "Attack 1: Peek Attack (Querying getRevealedBids before reveal deadline)",
-      desc: "Simulating unauthorized mempool query to inspect competitors' prices...",
+      title: "Invariant 1: Mempool Privacy Protection (Querying sealed bids before reveal window)",
+      desc: "Simulating unauthorized access attempt to read competing bid values...",
       status: "running"
     });
     setAttackLogs([...logs]);
@@ -171,18 +171,18 @@ export default function PublicAuditTab({
     try {
       await contract.getRevealedBids(selectedTenderId);
       logs[0].status = "failed";
-      logs[0].result = "WARNING: Bids were returned. (Reveal phase is already open).";
+      logs[0].result = "Notice: Bids returned. Reveal phase is currently active.";
     } catch (err) {
       const translated = parseContractError(err);
       logs[0].status = "blocked";
-      logs[0].result = `SHIELD ACTIVE: ${translated}`;
+      logs[0].result = `ENFORCED: ${translated}`;
     }
     setAttackLogs([...logs]);
 
     logs.push({
       step: 2,
-      title: "Attack 2: Edit Attack (Submitting duplicate commit to overwrite bid)",
-      desc: "Simulating a second commitBid transaction from an already committed bidder...",
+      title: "Invariant 2: Commitment Immutability (Attempting duplicate bid submission)",
+      desc: "Simulating an overwriting commit transaction from an existing bidder...",
       status: "running"
     });
     setAttackLogs([...logs]);
@@ -194,15 +194,15 @@ export default function PublicAuditTab({
           value: tenderDetails ? tenderDetails.bidBond : ethers.parseEther("1")
         });
         logs[1].status = "failed";
-        logs[1].result = "WARNING: Second commit was accepted.";
+        logs[1].result = "Notice: Duplicate commit was accepted.";
       } else {
         logs[1].status = "blocked";
-        logs[1].result = "SHIELD ACTIVE: Contract c.committed check prevents duplicate commits per wallet (verified via test suite).";
+        logs[1].result = "ENFORCED: Contract commit guard prevents duplicate commits per wallet.";
       }
     } catch (err) {
       const translated = parseContractError(err);
       logs[1].status = "blocked";
-      logs[1].result = `SHIELD ACTIVE: ${translated}`;
+      logs[1].result = `ENFORCED: ${translated}`;
     }
     setAttackLogs([...logs]);
     setIsAttacking(false);
@@ -338,7 +338,7 @@ export default function PublicAuditTab({
 
           {/* Protocol Metrics Widget */}
           <div className="sidebar-stats-card">
-            <div className="stats-card-title">Protocol Invariants</div>
+            <div className="stats-card-title">Protocol Metrics</div>
             <div className="stats-line">
               <span>Total Volume Locked</span>
               <strong>{platformStats?.tvl ? parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2) : "5.00"} {CURRENCY_SYMBOL}</strong>
@@ -349,10 +349,10 @@ export default function PublicAuditTab({
             </div>
             <div className="stats-line">
               <span>Sealed Privacy</span>
-              <strong className="text-emerald">100% On-Chain</strong>
+              <strong className="text-emerald">Enforced On-Chain</strong>
             </div>
             <button className="vita-attack-btn" onClick={runAttackDemo}>
-              ⚔️ Run Attack Demo
+              Run Security Verification
             </button>
           </div>
         </aside>
@@ -401,13 +401,13 @@ export default function PublicAuditTab({
 
                     {/* Department / Location */}
                     <div className="card-spec-row">
-                      <span className="spec-icon">📍</span>
+                      <span className="spec-label">Location:</span>
                       <span className="spec-text">{meta.location}</span>
                     </div>
 
                     {/* Dates / Timeline */}
                     <div className="card-spec-row">
-                      <span className="spec-icon">📅</span>
+                      <span className="spec-label">Phase:</span>
                       <span className="spec-text">
                         {getTenderPhase(tender) === "Commit Phase"
                           ? `Commit Phase (closes in ${formatCountdown(tender.commitDeadline)}) · Bond: ${bondFormatted} ${CURRENCY_SYMBOL}`
@@ -419,9 +419,9 @@ export default function PublicAuditTab({
 
                     {/* Capacity / Verifiers */}
                     <div className="card-spec-row">
-                      <span className="spec-icon">👥</span>
+                      <span className="spec-label">Audit:</span>
                       <span className="spec-text">
-                        2-of-2 Multi-Verifier Threshold · Anti-Sybil Group Protected
+                        2-of-2 Multi-Verifier Threshold · Anti-Collusion Group Protected
                       </span>
                     </div>
                   </div>
@@ -501,7 +501,7 @@ export default function PublicAuditTab({
                 <div className="section-title-row">
                   <h4>Cryptographic Bids Ledger</h4>
                   {isPreReveal && (
-                    <span className="badge-shield-mini">🔒 Sealed Bids, Hidden Until Reveal</span>
+                    <span className="badge-shield-mini">Sealed Bids · Hidden Until Reveal</span>
                   )}
                 </div>
 
@@ -549,7 +549,7 @@ export default function PublicAuditTab({
                               <td><code>{b.bidder}</code></td>
                               <td className="text-gold"><strong>{ethers.formatEther(b.amount)} {CURRENCY_SYMBOL}</strong></td>
                               <td>{new Date(Number(b.commitTime) * 1000).toLocaleString()}</td>
-                              <td>{isWin ? <span className="pill-gold">🏆 Winner</span> : <span className="pill-gray">Revealed</span>}</td>
+                              <td>{isWin ? <span className="pill-gold">Awarded Low Bid</span> : <span className="pill-gray">Revealed</span>}</td>
                             </tr>
                           );
                         })}
@@ -642,12 +642,12 @@ export default function PublicAuditTab({
         <div className="modal-backdrop" onClick={() => setShowAttackModal(false)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>⚔️ Protocol Security Attack Simulation</h3>
+              <h3>Protocol Security &amp; Invariant Audit</h3>
               <button className="btn-close" onClick={() => setShowAttackModal(false)}>×</button>
             </div>
             <div className="modal-body">
               <p className="modal-sub">
-                Live cryptographic verification that smart contract invariants reject adversarial attacks on-chain.
+                Live cryptographic verification confirming smart contract access controls and timing invariants on-chain.
               </p>
               <div className="attack-steps-list">
                 {attackLogs.map((log, i) => (
@@ -655,7 +655,7 @@ export default function PublicAuditTab({
                     <div className="attack-step-header">
                       <strong>{log.title}</strong>
                       <span className={`status-pill ${log.status}`}>
-                        {log.status === "running" ? "Running..." : log.status === "blocked" ? "🛡️ BLOCKED BY CONTRACT" : "FAILED"}
+                        {log.status === "running" ? "Executing..." : log.status === "blocked" ? "Enforced: Blocked On-Chain" : "Failed"}
                       </span>
                     </div>
                     <div className="attack-step-desc">{log.desc}</div>

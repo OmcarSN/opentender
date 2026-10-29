@@ -644,9 +644,19 @@ code, pre {
 .card-spec-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+.spec-label {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 58px;
+  flex-shrink: 0;
 }
 
 .spec-icon {

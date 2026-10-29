@@ -309,9 +309,9 @@ export default function OfficerTab({
         {/* Department: Create Tender */}
         <div className="panel">
           <div className="panel-header">
-            <h3>🏛️ Department: Publish Tender</h3>
+            <h3>Publish Public Tender</h3>
             <button type="button" className="btn-mini btn-secondary" onClick={handleFillDemo}>
-              ⚡ Fill Demo Values
+              Fill Demo Values
             </button>
           </div>
 
@@ -395,7 +395,7 @@ export default function OfficerTab({
                 onChange={(e) => setPenaltyBps(e.target.value)}
                 required
               />
-              <div className="field-hint">Late delivery penalty. 100 BPS = 1% per day. Max 1000 BPS (10%).</div>
+              <div className="field-hint">Late delivery penalty deduction. 100 BPS = 1% per day (max 1000 BPS / 10%).</div>
             </div>
 
             <div className="form-group">
@@ -430,7 +430,7 @@ export default function OfficerTab({
             </div>
 
             <button type="submit" className="btn btn-primary btn-block">
-              🚀 Publish Public Tender
+              Publish Public Tender
             </button>
           </form>
         </div>
@@ -438,7 +438,7 @@ export default function OfficerTab({
         {/* Department: Tender Lifecycle Execution */}
         <div className="panel">
           <div className="panel-header">
-            <h3>⚙️ Department: Tender Lifecycle Control</h3>
+            <h3>Tender Lifecycle Management</h3>
             <span className="badge badge-dept">Department Role</span>
           </div>
 
@@ -461,8 +461,8 @@ export default function OfficerTab({
               {/* Finalize Award */}
               <div className="action-row">
                 <div>
-                  <strong>Finalize Award (Post-Reveal)</strong>
-                  <p className="field-hint">Evaluates lowest valid bid, assigns contractor, forfeits unrevealed bonds.</p>
+                  <strong>Finalize Award</strong>
+                  <p className="field-hint">Evaluates lowest valid bid, assigns contractor, and forfeits unrevealed bonds.</p>
                 </div>
                 <button type="button" className="btn btn-outline" onClick={handleFinalizeAward}>
                   Finalize Award
@@ -483,8 +483,8 @@ export default function OfficerTab({
               {/* Cancel Tender */}
               <div className="action-row">
                 <div>
-                  <strong>Cancel Tender (Before Commit Closes)</strong>
-                  <p className="field-hint">Cancels tender and releases all committed bid bonds for refund.</p>
+                  <strong>Cancel Tender (Pre-Commit Deadline)</strong>
+                  <p className="field-hint">Cancels tender and unlocks all committed bid bonds for pull refund.</p>
                 </div>
                 <button type="button" className="btn btn-warning" onClick={handleCancelTender}>
                   Cancel Tender
@@ -513,13 +513,13 @@ export default function OfficerTab({
         {/* Verifier Panel */}
         <div className="panel">
           <div className="panel-header">
-            <h3>🔍 Verifier: Milestone Sign-Off</h3>
+            <h3>Milestone Verification</h3>
             <span className="badge badge-verifier">Verifier Role</span>
           </div>
 
           <div className="form-card">
             <p className="field-hint">
-              Engineers and auditors verify delivered completion proofs. Reaching the approval threshold releases milestone payout and auto-deducts late delivery penalties.
+              Auditors and engineers verify delivered completion proofs. Meeting the approval threshold automatically triggers milestone payout and applies late-delivery penalty deductions.
             </p>
             <div className="form-row">
               <div className="form-group col-half">
@@ -547,7 +547,7 @@ export default function OfficerTab({
             </div>
 
             <button type="button" className="btn btn-success btn-block" onClick={handleApproveMilestone}>
-              ✍️ Sign Off Milestone Approval
+              Sign Off Milestone Approval
             </button>
           </div>
         </div>
@@ -555,7 +555,7 @@ export default function OfficerTab({
         {/* Registrar Panel */}
         <div className="panel">
           <div className="panel-header">
-            <h3>⚖️ Registrar: Participant Governance</h3>
+            <h3>Entity Registration &amp; Governance</h3>
             <span className="badge badge-registrar">Registrar Role</span>
           </div>
 
@@ -588,7 +588,7 @@ export default function OfficerTab({
 
             {/* Register Bidder with Group ID */}
             <div className="bidder-reg-box">
-              <label>Register Authorized Bidder (with Sybil Group Anti-Collusion ID):</label>
+              <label>Register Authorized Bidder (with Anti-Collusion Group Identifier):</label>
               <div className="form-row">
                 <input
                   type="text"
@@ -598,13 +598,13 @@ export default function OfficerTab({
                 />
                 <input
                   type="text"
-                  placeholder="Group ID (e.g. GROUP_ALPHA)"
+                  placeholder="Corporate Group ID (e.g. GROUP_ALPHA)"
                   value={regGroupId}
                   onChange={(e) => setRegGroupId(e.target.value)}
                 />
               </div>
               <button type="button" className="btn btn-outline btn-block" onClick={handleRegisterBidder}>
-                Register Bidder &amp; Anti-Sybil Group
+                Register Bidder &amp; Assign Corporate Group
               </button>
             </div>
 

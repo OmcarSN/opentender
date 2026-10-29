@@ -299,12 +299,12 @@ export default function BidderTab({
               <div className="label-row">
                 <label>Cryptographic Secret Salt (32-bytes)</label>
                 <button type="button" className="btn-mini btn-secondary" onClick={handleGenerateSalt}>
-                  🎲 Generate Salt
+                  Generate Random Salt
                 </button>
               </div>
               <input
                 type="text"
-                placeholder="Click Generate Salt or paste 0x... hex"
+                placeholder="Click Generate Random Salt or paste 0x... hex"
                 value={salt}
                 onChange={(e) => setSalt(e.target.value)}
                 required
@@ -316,17 +316,17 @@ export default function BidderTab({
                 <div className="hash-title">Computed keccak256 Commitment Hash:</div>
                 <code className="hash-val">{computedHash}</code>
                 <div className="hash-note">
-                  🔒 Binds your price + salt + wallet + Tender #{commitTenderId} + Chain #{CHAIN_ID}.
+                  Cryptographically binds bid price, salt, wallet, Tender #{commitTenderId}, and Chain #{CHAIN_ID}.
                 </div>
               </div>
             )}
 
             <div className="backup-notice">
-              ⚠️ <strong>Mandatory Safety:</strong> A backup JSON containing your amount and salt will be automatically downloaded to your computer when you submit.
+              <strong>Security Requirement:</strong> An encrypted backup JSON containing your bid amount and salt will be automatically downloaded to your device upon submission. Keep this file to reveal your bid.
             </div>
 
             <button type="submit" className="btn btn-primary btn-block">
-              📥 Download Backup &amp; Submit Sealed Bid
+              Download Keyfile &amp; Submit Sealed Bid
             </button>
           </form>
         </div>
@@ -358,7 +358,7 @@ export default function BidderTab({
 
             {hasSavedBid ? (
               <div className="saved-bid-pill">
-                <span>✅ Found saved local backup credentials for this tender</span>
+                <span>Verified: Local bid credentials detected for Tender #{revealTenderId}</span>
               </div>
             ) : (
               <div className="backup-upload-box">
@@ -391,7 +391,7 @@ export default function BidderTab({
             </div>
 
             <button type="submit" className="btn btn-success btn-block">
-              🔓 Reveal Sealed Bid On-Chain
+              Reveal Sealed Bid On-Chain
             </button>
           </form>
         </div>
@@ -412,7 +412,7 @@ export default function BidderTab({
                 disabled={!claimableBalance || claimableBalance === 0n}
                 onClick={handleWithdrawBalance}
               >
-                💸 Withdraw Pull Balance
+                Withdraw Balance
               </button>
             </div>
             <p className="field-hint">
@@ -445,9 +445,9 @@ export default function BidderTab({
 
           {/* Contractor Milestone Evidence Submission */}
           <div className="milestone-submit-card">
-            <h4>Contractor: Submit Milestone Completion Evidence</h4>
+            <h4>Milestone Completion Proof</h4>
             <p className="field-hint">
-              Only the awarded contractor can submit completion proofs for the current pending milestone.
+              Authorized contractor submits cryptographic evidence notes or IPFS document hashes for verifier inspection.
             </p>
             <form onSubmit={handleSubmitMilestone} className="form-inline-stack">
               <div className="form-row">
@@ -487,7 +487,7 @@ export default function BidderTab({
               </div>
 
               <button type="submit" className="btn btn-primary">
-                📤 Submit Milestone Evidence
+                Submit Milestone Evidence
               </button>
             </form>
           </div>
