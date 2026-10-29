@@ -1,5 +1,98 @@
 import React, { useState, useEffect } from "react";
 
+// Official vector logos for supported Web3 wallets
+function WalletLogo({ walletId, detectedIcon, name }) {
+  const [imgError, setImgError] = useState(false);
+
+  if (detectedIcon && !imgError) {
+    return (
+      <img
+        src={detectedIcon}
+        alt={name || walletId}
+        className="web3-wallet-logo-img"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  if (walletId === "bridgekey") {
+    return (
+      <svg viewBox="0 0 40 40" width="40" height="40" fill="none" className="web3-wallet-svg">
+        <defs>
+          <linearGradient id="bkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#8B5CF6" />
+            <stop offset="100%" stopColor="#6D28D9" />
+          </linearGradient>
+        </defs>
+        <rect width="40" height="40" rx="10" fill="url(#bkGradient)" />
+        {/* BridgeKey Authentic 'B' Symbol */}
+        <g transform="translate(10, 8)" fill="white">
+          {/* Left vertical column: rounded upper segment + lower keyhole dot */}
+          <rect x="0" y="2" width="4.5" height="10" rx="2.25" />
+          <circle cx="2.25" cy="19.5" r="2.25" />
+          {/* Right curved lobes of the 'B' */}
+          <path d="M5.5 2H13.2C16.4 2 18.5 3.8 18.5 6.5C18.5 8.8 17 10.4 14.8 11C17.5 11.6 19.5 13.4 19.5 16.2C19.5 19.5 16.8 22 13 22H5.5V2Z" />
+          {/* Inner counter cuts with purple background matching the gradient */}
+          <path d="M9.5 5.2H12.5C14 5.2 14.8 6 14.8 7C14.8 8 14 8.8 12.5 8.8H9.5V5.2Z" fill="#7C3AED" />
+          <path d="M9.5 14.2H13C14.8 14.2 15.8 15.2 15.8 16.5C15.8 17.8 14.8 18.8 13 18.8H9.5V14.2Z" fill="#7C3AED" />
+        </g>
+      </svg>
+    );
+  }
+
+  if (walletId === "metamask") {
+    return (
+      <svg viewBox="0 0 318.6 318.6" width="34" height="34" className="web3-wallet-svg">
+        <path fill="#E2761B" stroke="#E2761B" strokeLinecap="round" strokeLinejoin="round" d="m274.1 35.5-99.5 73.9L194 65.4z" />
+        <path fill="#E4761B" stroke="#E4761B" strokeLinecap="round" strokeLinejoin="round" d="m44.4 35.5 98.7 74.6-17.5-64.7z" />
+        <path fill="#E4761B" stroke="#E4761B" strokeLinecap="round" strokeLinejoin="round" d="m238.3 206.8-28.5 42.2 56.8 15.6 16.3-56.7z" />
+        <path fill="#E4761B" stroke="#E4761B" strokeLinecap="round" strokeLinejoin="round" d="m35.1 207.9 16.2 56.7 56.8-15.6-28.5-42.2z" />
+        <path fill="#E4761B" stroke="#E4761B" strokeLinecap="round" strokeLinejoin="round" d="m103.5 138.7-18.4 27.6 65.3 2.9-2.2-70.2z" />
+        <path fill="#E4761B" stroke="#E4761B" strokeLinecap="round" strokeLinejoin="round" d="m215 138.7-45.5-39.8-1.5 70.3 65.4-2.9z" />
+        <path fill="#F6851B" stroke="#F6851B" strokeLinecap="round" strokeLinejoin="round" d="m108 250.2 39.8-19.3-33.8-26.4z" />
+        <path fill="#F6851B" stroke="#F6851B" strokeLinecap="round" strokeLinejoin="round" d="m170.6 230.9 39.9 19.3-5.9-45.7z" />
+        <path fill="#C0AD9E" stroke="#C0AD9E" strokeLinecap="round" strokeLinejoin="round" d="m209.8 250.2-39.9-19.3 5.3 28.3.6 13.9z" />
+        <path fill="#161616" stroke="#161616" strokeLinecap="round" strokeLinejoin="round" d="m175.8 259.2-5.2-28.3h-22.7l-5.2 28.3-27.1 27.3h87.3z" />
+        <path fill="#763D16" stroke="#763D16" strokeLinecap="round" strokeLinejoin="round" d="m159.2 195.9 8.9-8.7-27.3.3z" />
+        <path fill="#F6851B" stroke="#F6851B" strokeLinecap="round" strokeLinejoin="round" d="m147.8 187.5 22.8-21.4 7.7 20.3-19 1z" />
+        <path fill="#F6851B" stroke="#F6851B" strokeLinecap="round" strokeLinejoin="round" d="m141.7 186.4 19-1-7.7-20.3-22.8 21.4z" />
+        <path fill="#E4761B" stroke="#E4761B" strokeLinecap="round" strokeLinejoin="round" d="m119.9 119.5 28 66.9-4.4-47.7z" />
+        <path fill="#E4761B" stroke="#E4761B" strokeLinecap="round" strokeLinejoin="round" d="m170.6 119.5-23.6 19.2-4.4 47.7z" />
+        <path fill="#F6851B" stroke="#F6851B" strokeLinecap="round" strokeLinejoin="round" d="m159.3 35.5-16.1 44.5 16.1 39.5 16.1-39.5z" />
+        <path fill="#D7C1B3" stroke="#D7C1B3" strokeLinecap="round" strokeLinejoin="round" d="m238.3 206.8-28.5 42.2 44.6-26.6z" />
+        <path fill="#D7C1B3" stroke="#D7C1B3" strokeLinecap="round" strokeLinejoin="round" d="m80.3 249-28.5-42.2-16.1 15.6z" />
+        <path fill="#233447" stroke="#233447" strokeLinecap="round" strokeLinejoin="round" d="m209.8 249-34 10.2 3.5 13.9 30.5-24.1z" />
+        <path fill="#233447" stroke="#233447" strokeLinecap="round" strokeLinejoin="round" d="m108 249-34 10.2 3.5 13.9 30.5-24.1z" />
+      </svg>
+    );
+  }
+
+  if (walletId === "coinbase") {
+    return (
+      <svg viewBox="0 0 40 40" width="40" height="40" fill="none" className="web3-wallet-svg">
+        <rect width="40" height="40" rx="10" fill="#0052FF" />
+        <rect x="9" y="9" width="22" height="22" rx="6" fill="white" />
+        <circle cx="20" cy="20" r="5" fill="#0052FF" />
+      </svg>
+    );
+  }
+
+  // Default Injected / Web3 Universal Ethereum Diamond
+  return (
+    <svg viewBox="0 0 40 40" width="40" height="40" fill="none" className="web3-wallet-svg">
+      <rect width="40" height="40" rx="10" fill="#141E28" stroke="rgba(45, 212, 191, 0.2)" />
+      <g transform="translate(10, 6) scale(0.625)">
+        <polygon points="16 0 16 23.5 32 16.3" fill="#8A92B2" />
+        <polygon points="16 0 0 16.3 16 23.5" fill="#62688F" />
+        <polygon points="16 25.5 16 39.9 32 18.2" fill="#8A92B2" />
+        <polygon points="16 39.9 16 25.5 0 18.2" fill="#62688F" />
+        <polygon points="16 23.5 32 16.3 16 11.5" fill="#454A75" />
+        <polygon points="0 16.3 16 23.5 16 11.5" fill="#454A75" />
+      </g>
+    </svg>
+  );
+}
+
 export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
   const [detectedMap, setDetectedMap] = useState({});
   const [connectingId, setConnectingId] = useState(null);
@@ -16,13 +109,24 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
     function onAnnounce(event) {
       const { info, provider } = event.detail || {};
       if (info && provider) {
-        const key = (info.name || "").toLowerCase();
-        providers[key] = {
+        const rawName = (info.name || "").toLowerCase().replace(/\s+/g, "");
+        const entry = {
           name: info.name,
           icon: info.icon,
           provider: provider,
-          rdns: info.rdns
+          rdns: info.rdns,
         };
+        providers[rawName] = entry;
+
+        if (rawName.includes("bridgekey") || (info.rdns && info.rdns.includes("bridgekey"))) {
+          providers["bridgekey"] = entry;
+        }
+        if (rawName.includes("metamask") || (info.rdns && info.rdns.includes("metamask"))) {
+          providers["metamask"] = entry;
+        }
+        if (rawName.includes("coinbase") || (info.rdns && info.rdns.includes("coinbase"))) {
+          providers["coinbase"] = entry;
+        }
         setDetectedMap({ ...providers });
       }
     }
@@ -36,7 +140,8 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
       if (window.bridgekey || window.bridgeKey) {
         providers["bridgekey"] = {
           name: "BridgeKey",
-          provider: window.bridgekey?.ethereum || window.bridgekey || window.bridgeKey
+          icon: window.bridgekey?.icon || window.bridgeKey?.icon,
+          provider: window.bridgekey?.ethereum || window.bridgekey || window.bridgeKey,
         };
       }
 
@@ -115,8 +220,8 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
           </div>
           <button className="web3-modal-close" onClick={onClose} aria-label="Close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -137,16 +242,11 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
             }
           >
             <div className="web3-wallet-icon-wrap bridgekey-brand">
-              <svg viewBox="0 0 40 40" width="28" height="28" fill="none">
-                <rect width="40" height="40" rx="9" fill="#5850EC" />
-                <path
-                  d="M13 11H22C24.8 11 27 13 27 15.5C27 17.2 26 18.6 24.5 19.3C26.5 20 27.5 21.8 27.5 24C27.5 26.8 25 29 22 29H13V11Z"
-                  fill="white"
-                  fillOpacity="0.18"
-                />
-                <path d="M16 14H21.5C23 14 24.2 15 24.2 16.5C24.2 18 23 19 21.5 19H16V14Z" fill="white" />
-                <path d="M16 21H22C23.6 21 24.8 22.1 24.8 23.6C24.8 25.1 23.6 26.2 22 26.2H16V21Z" fill="white" />
-              </svg>
+              <WalletLogo
+                walletId="bridgekey"
+                detectedIcon={detectedMap["bridgekey"]?.icon}
+                name="BridgeKey"
+              />
             </div>
             <div className="web3-wallet-details">
               <div className="web3-wallet-name-line">
@@ -181,18 +281,11 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
             }
           >
             <div className="web3-wallet-icon-wrap metamask-brand">
-              <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
-                <path d="M29.5 3L18.5 11.2L20.5 6.5L29.5 3Z" fill="#E2761B" stroke="#E2761B" />
-                <path d="M2.5 3L13.4 11.2L11.5 6.5L2.5 3Z" fill="#E4761B" stroke="#E4761B" />
-                <path d="M25 22.5L22 27L28.5 28.5L30.5 22.5H25Z" fill="#E4761B" stroke="#E4761B" />
-                <path d="M1.5 22.5L3.5 28.5L10 27L7 22.5H1.5Z" fill="#E4761B" stroke="#E4761B" />
-                <path d="M9.8 14.5L7.5 18L13.8 18.3L13.5 11.5L9.8 14.5Z" fill="#E4761B" stroke="#E4761B" />
-                <path d="M22.2 14.5L18.5 11.5L18.2 18.3L24.5 18L22.2 14.5Z" fill="#E4761B" stroke="#E4761B" />
-                <path d="M10 27L13.5 25.2L10.5 22.5L10 27Z" fill="#D7C1B3" stroke="#D7C1B3" />
-                <path d="M22 27L21.5 22.5L18.5 25.2L22 27Z" fill="#D7C1B3" stroke="#D7C1B3" />
-                <path d="M18.5 25.2L21.5 22.5H10.5L13.5 25.2H18.5Z" fill="#233447" stroke="#233447" />
-                <path d="M16 3L11.5 6.5L13.5 11.5L16 10L18.5 11.5L20.5 6.5L16 3Z" fill="#F6851B" stroke="#F6851B" />
-              </svg>
+              <WalletLogo
+                walletId="metamask"
+                detectedIcon={detectedMap["metamask"]?.icon}
+                name="MetaMask"
+              />
             </div>
             <div className="web3-wallet-details">
               <span className="web3-wallet-name">MetaMask</span>
@@ -224,10 +317,11 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
             }
           >
             <div className="web3-wallet-icon-wrap coinbase-brand">
-              <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
-                <rect width="32" height="32" rx="7" fill="#0052FF" />
-                <path d="M16 6C10.4772 6 6 10.4772 6 16C6 21.5228 10.4772 26 16 26C21.5228 26 26 21.5228 26 16C26 10.4772 21.5228 6 16 6ZM13.5 13.5H18.5V18.5H13.5V13.5Z" fill="white" />
-              </svg>
+              <WalletLogo
+                walletId="coinbase"
+                detectedIcon={detectedMap["coinbase"]?.icon}
+                name="Coinbase Wallet"
+              />
             </div>
             <div className="web3-wallet-details">
               <span className="web3-wallet-name">Coinbase Wallet</span>
@@ -252,10 +346,11 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
             onClick={() => handleSelect("injected", "Browser Wallet", () => window.ethereum)}
           >
             <div className="web3-wallet-icon-wrap default-brand">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                <line x1="2" y1="10" x2="22" y2="10"></line>
-              </svg>
+              <WalletLogo
+                walletId="injected"
+                detectedIcon={detectedMap["injected"]?.icon}
+                name="Browser Injected"
+              />
             </div>
             <div className="web3-wallet-details">
               <span className="web3-wallet-name">Browser Injected</span>

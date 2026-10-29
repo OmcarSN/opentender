@@ -1489,27 +1489,52 @@ code, pre {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.web3-wallet-row:hover .web3-wallet-icon-wrap {
+  transform: scale(1.05);
 }
 
 .web3-wallet-icon-wrap.bridgekey-brand {
-  background: rgba(88, 80, 236, 0.15);
-  border: 1px solid rgba(88, 80, 236, 0.35);
+  background: #7c3aed;
+  border: 1px solid rgba(167, 139, 250, 0.3);
 }
 
 .web3-wallet-icon-wrap.metamask-brand {
-  background: rgba(246, 133, 27, 0.12);
+  background: #181512;
   border: 1px solid rgba(246, 133, 27, 0.3);
 }
 
 .web3-wallet-icon-wrap.coinbase-brand {
-  background: rgba(0, 82, 255, 0.12);
-  border: 1px solid rgba(0, 82, 255, 0.3);
+  background: #0052ff;
+  border: 1px solid rgba(59, 130, 246, 0.4);
 }
 
 .web3-wallet-icon-wrap.default-brand {
-  background: rgba(6, 182, 212, 0.1);
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  color: #67e8f9;
+  background: #141e28;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+}
+
+.web3-wallet-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.web3-wallet-icon-wrap.metamask-brand .web3-wallet-svg {
+  width: 32px;
+  height: 32px;
+}
+
+.web3-wallet-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  display: block;
 }
 
 .web3-wallet-details {
