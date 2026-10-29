@@ -99,6 +99,8 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [claimableBalance, setClaimableBalance] = useState(0n);
   const [latestBlockTimestamp, setLatestBlockTimestamp] = useState(0);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [dataLoadError, setDataLoadError] = useState(null);
 
   const [notification, setNotification] = useState({
     active: false,
@@ -110,6 +112,8 @@ export default function App() {
 
   // Load tenders, stats, and events from contract
   const loadContractData = useCallback(async () => {
+    setIsDataLoading(true);
+    setDataLoadError(null);
     try {
       const readContract = getReadOnlyContract();
 
@@ -133,8 +137,16 @@ export default function App() {
         });
       }
 
-      // Fetch all tenders
-      const count = Number(await readContract.tenderCount().catch(() => 0n));
+      // Fetch all tenders with error detection
+      let count = 0;
+      try {
+        const countBig = await readContract.tenderCount();
+        count = Number(countBig);
+      } catch (err) {
+        console.warn("Could not query tenderCount from contract:", err);
+        setDataLoadError("Unable to reach contract on configured RPC endpoint.");
+      }
+
       const loadedTenders = [];
       for (let i = 1; i <= count; i++) {
         try {
@@ -236,6 +248,9 @@ export default function App() {
       }
     } catch (err) {
       console.warn("Read-only contract load notice:", err);
+      setDataLoadError("Could not connect to contract. Please verify RPC endpoint.");
+    } finally {
+      setIsDataLoading(false);
     }
   }, [selectedTenderId]);
 
@@ -467,6 +482,11 @@ export default function App() {
               if (account) checkAccountRoles(account, signer);
             }}
             setNotification={setNotification}
+            isDataLoading={isDataLoading}
+            dataLoadError={dataLoadError}
+            chainId={chainId}
+            roles={roles}
+            latestBlockTimestamp={latestBlockTimestamp}
           />
         )}
 

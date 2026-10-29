@@ -2518,6 +2518,167 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 500;
 }
 
+/* Bidder Portal Validation & Keyfile Elements */
+.field-validation-error {
+  font-size: 0.74rem;
+  color: #fca5a5;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  line-height: 1.4;
+}
+
+.field-validation-success {
+  font-size: 0.74rem;
+  color: #6ee7b7;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  line-height: 1.4;
+}
+
+.field-status-box {
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  margin-top: 0.35rem;
+}
+
+.field-status-box.info-box {
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.22);
+  color: #bae6fd;
+}
+
+.portal-alert {
+  border-radius: 12px;
+  padding: 0.85rem 1.15rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.portal-alert.alert-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fef08a;
+}
+
+.portal-alert.alert-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fecdd3;
+}
+
+.portal-alert.alert-success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #a7f3d0;
+}
+
+.portal-alert-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.portal-alert-body {
+  flex: 1;
+}
+
+.btn-alert-action {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  margin-left: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-alert-action:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.keyfile-import-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.25rem 0 0.5rem 0;
+}
+
+.keyfile-import-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.keyfile-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.keyfile-status-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.keyfile-hidden-input {
+  display: none;
+}
+
+.keyfile-drop-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.keyfile-drop-label:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-strong);
+  color: #ffffff;
+}
+
+.refund-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 1.25rem 0;
+}
+
+.text-subtle {
+  color: #94a3b8 !important;
+}
+
+.text-success {
+  color: #6ee7b7 !important;
+}
+
 .backup-upload-box input[type="file"] {
   color: var(--text-muted);
   font-size: 0.82rem;
