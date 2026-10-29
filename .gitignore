@@ -1,6 +1,7 @@
 node_modules/
 dashboard/node_modules/
 .env
+.demo-wallets.json
 .env.local
 .env.production
 .env.development

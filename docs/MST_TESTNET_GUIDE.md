@@ -7,10 +7,10 @@ This guide details how to configure, deploy, and execute the automated live demo
 ## 1. Network Parameters
 
 - **Network Name**: MST Testnet
-- **RPC URL**: `https://testnet-rpc.mstblockchain.com`
-- **Chain ID**: `4545`
-- **Currency Symbol**: `MSTC`
-- **Explorer**: `https://testnet-scan.mstblockchain.com`
+- **RPC URL**: `https://testnetrpc.mstblockchain.com`
+- **Chain ID**: `91562037`
+- **Currency Symbol**: `tMSTC`
+- **Explorer**: `https://testnet.mstscan.com`
 
 ---
 
@@ -22,11 +22,11 @@ This guide details how to configure, deploy, and execute the automated live demo
    ```
 2. Populate `DEPLOYER_PRIVATE_KEY` with your funded MST Testnet account private key:
    ```env
-   MST_RPC_URL=https://testnet-rpc.mstblockchain.com
-   MST_CHAIN_ID=4545
+   MST_RPC_URL=https://testnetrpc.mstblockchain.com
+   MST_CHAIN_ID=91562037
    DEPLOYER_PRIVATE_KEY=your_private_key_here
    ```
-   > **Note:** The deployer key must have at least `0.3 MSTC` to fund the ephemeral roles and deploy the contracts.
+   > **Note:** The deployer key must have at least `0.3 tMSTC` to fund the ephemeral roles and deploy the contracts.
 
 ---
 
@@ -45,7 +45,7 @@ npm run demo:live
 
 **How the Live Script Works:**
 1. Generates ephemeral wallets for Department, Verifier 1, Verifier 2, Bidder 1, and Bidder 2.
-2. Funds each ephemeral wallet with 0.05 MSTC from the Deployer account.
+2. Funds each ephemeral wallet with 0.05 tMSTC from the Deployer account.
 3. Deploys/attaches `OpenTender` and registers all roles and bidder credentials.
 4. Opens a Tender with a **3-minute commit phase** and a **3-minute reveal phase**.
 5. Submits sealed commitments from Bidder 1 (0.018 MSTC) and Bidder 2 (0.015 MSTC).

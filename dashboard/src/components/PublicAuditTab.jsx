@@ -391,18 +391,44 @@ export default function PublicAuditTab({
             <div className="stats-line">
               <span className="stats-metric-label">Total Volume Locked</span>
               <strong className="stats-metric-value">
-                {platformStats?.tvl ? parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2) : "5.00"} {CURRENCY_SYMBOL}
+                {dataLoadError
+                  ? "-"
+                  : isDataLoading && !platformStats
+                  ? "..."
+                  : platformStats?.tvl !== undefined
+                  ? `${parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2)} ${CURRENCY_SYMBOL}`
+                  : "-"}
               </strong>
             </div>
             <div className="stats-line">
               <span className="stats-metric-label">Registered Bidders</span>
               <strong className="stats-metric-value">
-                {platformStats?.registeredBidders?.toString() || "2"}
+                {dataLoadError
+                  ? "-"
+                  : isDataLoading && !platformStats
+                  ? "..."
+                  : platformStats?.registeredBidders !== undefined
+                  ? platformStats.registeredBidders.toString()
+                  : "-"}
+              </strong>
+            </div>
+            <div className="stats-line">
+              <span className="stats-metric-label">Active Tenders</span>
+              <strong className="stats-metric-value">
+                {dataLoadError
+                  ? "-"
+                  : isDataLoading && !platformStats
+                  ? "..."
+                  : platformStats?.tendersCount !== undefined
+                  ? platformStats.tendersCount.toString()
+                  : "-"}
               </strong>
             </div>
             <div className="stats-line">
               <span className="stats-metric-label">Sealed Privacy</span>
-              <strong className="stats-metric-value text-emerald">Enforced On-Chain</strong>
+              <strong className="stats-metric-value text-emerald">
+                {dataLoadError ? "-" : "Enforced On-Chain"}
+              </strong>
             </div>
             <button className="vita-attack-btn" onClick={runAttackDemo}>
               Run Security Verification

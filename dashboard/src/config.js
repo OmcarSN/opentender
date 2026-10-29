@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 import OpenTenderABIJson from "./abi/OpenTenderABI.json";
 
-export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82";
+export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x493Bb88ad309346aA84E237aC84c8612eD1852d8";
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "https://testnetrpc.mstblockchain.com";
 export const CHAIN_ID = parseInt(import.meta.env.VITE_CHAIN_ID || "91562037", 10);
 export const CHAIN_NAME = import.meta.env.VITE_CHAIN_NAME || "MST Testnet";

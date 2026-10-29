@@ -41,8 +41,8 @@ module.exports = {
       chainId: 31337,
     },
     mstTestnet: {
-      url: process.env.MST_RPC_URL || "https://testnetrpc.mstblockchain.com",
-      chainId: Number(process.env.MST_CHAIN_ID || 91562037),
+      url: "https://testnetrpc.mstblockchain.com",
+      chainId: 91562037,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
     },
     sepolia: {

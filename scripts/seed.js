@@ -91,14 +91,14 @@ async function main() {
   try {
     await hre.ethers.provider.send("hardhat_setBalance", [
       browserUser,
-      "0x3635C9ADC5DEA00000", // 1000 ETH
+      "0x3635C9ADC5DEA00000",
     ]);
     const DEPARTMENT_ROLE = await openTender.DEPARTMENT_ROLE();
     const VERIFIER_ROLE = await openTender.VERIFIER_ROLE();
     await (await openTender.grantRole(DEPARTMENT_ROLE, browserUser)).wait();
     await (await openTender.grantRole(VERIFIER_ROLE, browserUser)).wait();
     await (await openTender.registerBidder(browserUser, hre.ethers.id("USER_BROWSER_ID"), hre.ethers.id("GROUP_ALPHA"))).wait();
-    console.log(`- Granted Department, Verifier, Bidder roles and 1,000 ETH to browser account: ${browserUser}`);
+    console.log(`- Granted Department, Verifier, Bidder roles to browser account: ${browserUser}`);
   } catch (err) {
     // Non-fatal if on public testnet
   }

@@ -332,7 +332,7 @@ export default function App() {
         try {
           await browserProvider.send("hardhat_setBalance", [
             addr,
-            "0x3635C9ADC5DEA00000", // 1,000 ETH
+            "0x3635C9ADC5DEA00000",
           ]);
         } catch {
           // Ignore if provider doesn't support
