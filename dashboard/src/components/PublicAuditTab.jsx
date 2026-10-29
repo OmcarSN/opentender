@@ -33,9 +33,30 @@ export default function PublicAuditTab({
   latestBlockTimestamp = 0
 }) {
   const [blockTimestamp, setBlockTimestamp] = useState(latestBlockTimestamp || 0);
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [scaleFilter, setScaleFilter] = useState("all");
-  const [searchFilter, setSearchFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("category") || "all";
+    } catch {
+      return "all";
+    }
+  });
+  const [scaleFilter, setScaleFilter] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("scale") || "all";
+    } catch {
+      return "all";
+    }
+  });
+  const [searchFilter, setSearchFilter] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("search") || "";
+    } catch {
+      return "";
+    }
+  });
   const [showDetailModal, setShowDetailModal] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search);
@@ -372,9 +393,16 @@ export default function PublicAuditTab({
         <main className="vita-cards-list">
           {filteredTenders.length === 0 ? (
             <div className="empty-catalog-card">
+              <div className="empty-catalog-icon">✻</div>
               <h3>No tenders match your filter</h3>
-              <p>Try resetting filters or deploy a new tender in the Officer tab.</p>
-              <button className="category-chip active" onClick={() => { setCategoryFilter("all"); setScaleFilter("all"); }}>
+              <p>Try resetting your category or procurement scale filters to view all verified tenders.</p>
+              <button
+                className="empty-reset-btn"
+                onClick={() => {
+                  setCategoryFilter("all");
+                  setScaleFilter("all");
+                }}
+              >
                 Reset Filters
               </button>
             </div>

@@ -439,7 +439,7 @@ code, pre {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
@@ -450,6 +450,7 @@ code, pre {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  align-self: start;
 }
 
 .sidebar-group {
@@ -584,6 +585,8 @@ code, pre {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  height: 100%;
+  min-width: 0;
 }
 
 /* ==========================================================================
@@ -886,21 +889,67 @@ code, pre {
 /* Empty State Card */
 .empty-catalog-card {
   background: var(--bg-card);
-  border: 1px dashed var(--border-medium);
-  border-radius: 18px;
-  padding: 3rem 2rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 3.5rem 2rem;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 420px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.empty-catalog-icon {
+  font-size: 1.8rem;
+  color: var(--emerald-light);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .empty-catalog-card h3 {
   color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
 }
 
 .empty-catalog-card p {
   color: var(--text-muted);
   font-size: 0.85rem;
-  margin-bottom: 1.25rem;
+  line-height: 1.5;
+  margin-bottom: 1.35rem;
+  max-width: 420px;
+}
+
+.empty-reset-btn {
+  background: #ffffff;
+  color: #0b1413;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.65rem 1.75rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15);
+}
+
+.empty-reset-btn:hover {
+  background: #f0fdf4;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25);
 }
 
 /* ==========================================================================
@@ -2133,6 +2182,10 @@ input[type="file"]::file-selector-button:hover {
   .category-chips {
     flex-direction: row;
     flex-wrap: wrap;
+  }
+  .empty-catalog-card {
+    min-height: 280px;
+    padding: 2.5rem 1.5rem;
   }
 }
 
