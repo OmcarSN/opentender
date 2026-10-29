@@ -11,6 +11,7 @@ import {
   getSignerContract,
 } from "./config";
 import Header from "./components/Header";
+import WalletModal from "./components/WalletModal";
 import PublicAuditTab from "./components/PublicAuditTab";
 import BidderTab from "./components/BidderTab";
 import OfficerTab from "./components/OfficerTab";
@@ -30,6 +31,15 @@ export default function App() {
     isDebarred: false,
   });
 
+  const [showWalletModal, setShowWalletModal] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("walletModal") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [activeWalletProvider, setActiveWalletProvider] = useState(() => (typeof window !== "undefined" ? window.ethereum || null : null));
   const [searchQuery, setSearchQuery] = useState("");
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -260,18 +270,31 @@ export default function App() {
     }
   }, []);
 
-  // Connect MetaMask
-  async function connectWallet() {
-    if (!window.ethereum) {
-      alert("MetaMask is not installed. Please install MetaMask to interact with OpenTender.");
+  // Connect Wallet (opens Multi-Wallet selection modal or connects directly)
+  function handleOpenConnect() {
+    setShowWalletModal(true);
+  }
+
+  async function connectWalletWithProvider(chosenProvider) {
+    const rawProvider = chosenProvider || activeWalletProvider || window.ethereum;
+    if (!rawProvider) {
+      setNotification({
+        active: true,
+        title: "No Wallet Detected",
+        error: "Please install or unlock BridgeKey, MetaMask, or a compatible Web3 browser extension."
+      });
       return;
     }
     try {
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      if (rawProvider.request) {
+        await rawProvider.request({ method: "eth_requestAccounts" });
+      }
+      const browserProvider = new ethers.BrowserProvider(rawProvider);
       const s = await browserProvider.getSigner();
       const addr = await s.getAddress();
       const network = await browserProvider.getNetwork();
 
+      setActiveWalletProvider(rawProvider);
       setAccount(addr);
       setSigner(s);
       setChainId(Number(network.chainId));
@@ -289,23 +312,25 @@ export default function App() {
 
       await checkAccountRoles(addr, s);
       await loadContractData();
+      setShowWalletModal(false);
     } catch (err) {
-      setNotification({ active: false, title: "Connection Failed", error: parseContractError(err) });
+      setNotification({ active: true, title: "Connection Failed", error: parseContractError(err) });
     }
   }
 
   // Add / Switch Network
   async function switchNetwork() {
-    if (!window.ethereum) return;
+    const provider = activeWalletProvider || window.ethereum;
+    if (!provider || !provider.request) return;
     const hexChainId = "0x" + CHAIN_ID.toString(16);
     try {
-      await window.ethereum.request({
+      await provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: hexChainId }],
       });
     } catch (switchError) {
       if (switchError.code === 4902) {
-        await window.ethereum.request({
+        await provider.request({
           method: "wallet_addEthereumChain",
           params: [
             {
@@ -325,21 +350,33 @@ export default function App() {
     }
   }
 
-  // Handle account and network changes in MetaMask
+  // Handle account and network changes in active wallet
   useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.on("accountsChanged", (accounts) => {
-        if (accounts.length > 0) {
-          connectWallet();
+    const p = activeWalletProvider || (typeof window !== "undefined" ? window.ethereum : null);
+    if (p && p.on) {
+      const handleAccounts = (accounts) => {
+        if (accounts && accounts.length > 0) {
+          connectWalletWithProvider(p);
         } else {
           setAccount(null);
           setSigner(null);
         }
-      });
-      window.ethereum.on("chainChanged", () => {
+      };
+      const handleChain = () => {
         window.location.reload();
-      });
+      };
+      p.on("accountsChanged", handleAccounts);
+      p.on("chainChanged", handleChain);
+      return () => {
+        if (p.removeListener) {
+          p.removeListener("accountsChanged", handleAccounts);
+          p.removeListener("chainChanged", handleChain);
+        }
+      };
     }
+  }, [activeWalletProvider]);
+
+  useEffect(() => {
     loadContractData();
     const interval = setInterval(loadContractData, 8000);
     return () => clearInterval(interval);
@@ -359,7 +396,7 @@ export default function App() {
           onTabChange={handleTabChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onConnect={connectWallet}
+          onConnect={handleOpenConnect}
           onSwitchNetwork={switchNetwork}
         />
 
@@ -423,6 +460,13 @@ export default function App() {
         <TxNotification
           notification={notification}
           onDismiss={() => setNotification({ active: false, title: "", hash: "", error: "", success: "" })}
+        />
+
+        {/* Multi-Wallet Connection Modal */}
+        <WalletModal
+          isOpen={showWalletModal}
+          onClose={() => setShowWalletModal(false)}
+          onSelectWallet={connectWalletWithProvider}
         />
       </div>
     </div>

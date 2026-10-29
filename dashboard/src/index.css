@@ -1229,6 +1229,179 @@ code, pre {
   padding: 0.65rem 1.25rem;
 }
 
+/* ==========================================================================
+   Multi-Wallet Connect Modal (BridgeKey, MetaMask, Injected)
+   ========================================================================== */
+.wallet-modal-dialog {
+  max-width: 520px;
+  padding: 1.75rem 2rem;
+  border-radius: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+}
+
+.wallet-modal-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.25rem;
+}
+
+.wallet-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+  overflow-y: auto;
+  max-height: 55vh;
+  padding-right: 0.25rem;
+}
+
+.wallet-option-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.95rem 1.15rem;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.wallet-option-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.wallet-option-card.is-detected {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.04);
+}
+
+.wallet-option-card.is-detected:hover {
+  border-color: var(--emerald);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.wallet-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bridgekey-icon-box {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.metamask-icon-box {
+  background: rgba(246, 133, 27, 0.12);
+  border: 1px solid rgba(246, 133, 27, 0.3);
+}
+
+.generic-icon-box {
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.generic-wallet-symbol {
+  font-size: 1.4rem;
+  color: var(--emerald-light);
+}
+
+.wallet-option-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.wallet-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wallet-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.wallet-tag-bridgekey {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wallet-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.wallet-status-dot.online {
+  background: var(--emerald);
+  box-shadow: 0 0 6px var(--emerald);
+}
+
+.wallet-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.wallet-connect-action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.wallet-option-card:hover .wallet-connect-action-btn {
+  background: #ffffff;
+  color: #0b1413;
+  border-color: #ffffff;
+}
+
+.wallet-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wallet-footer-help {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  line-height: 1.4;
+  flex: 1;
+}
+
 /* Attack Logs Box */
 .attack-box {
   background: #070d0c;
