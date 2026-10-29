@@ -158,6 +158,9 @@ export default function App() {
             bidBond: t.bidBond,
             commitDeadline: Number(t.commitDeadline),
             revealDeadline: Number(t.revealDeadline),
+            escrowDeadline: Number(t.escrowDeadline),
+            gracePeriod: Number(t.gracePeriod),
+            completedMilestones: Number(t.completedMilestones),
             status: Number(t.status),
             winningBidder: t.winningBidder,
             winningAmount: t.winningAmount,
@@ -503,6 +506,10 @@ export default function App() {
               if (account) checkAccountRoles(account, signer);
             }}
             setNotification={setNotification}
+            isDataLoading={isDataLoading}
+            dataLoadError={dataLoadError}
+            chainId={chainId}
+            latestBlockTimestamp={latestBlockTimestamp}
           />
         )}
       </main>
