@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { ethers } from "ethers";
 import { CURRENCY_SYMBOL, CHAIN_ID, DEMO_VERIFIERS, getReadOnlyContract } from "../config";
 import { parseContractError } from "../utils/errors";
