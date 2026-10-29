@@ -993,8 +993,8 @@ export default function OfficerTab({
               </div>
 
               {/* Cancel Tender */}
-              <div className="action-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+              <div className="action-row action-row-cancel">
+                <div className="cancel-action-header">
                   <div className="action-row-content">
                     <strong>Cancel Tender (Pre-Commit Deadline)</strong>
                     <p className="field-hint">

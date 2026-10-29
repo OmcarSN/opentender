@@ -170,41 +170,61 @@ code, pre {
 .vita-nav {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
 .vita-nav .nav-link {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  padding: 0.25rem 0;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
   transition: all 0.2s ease;
   position: relative;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .vita-nav .nav-link:hover {
   color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .vita-nav .nav-link.active {
   color: #ffffff;
   font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .vita-nav .nav-link.active::after {
   content: "";
   position: absolute;
-  bottom: -4px;
-  left: 0;
-  right: 0;
+  bottom: -2px;
+  left: 12%;
+  right: 12%;
   height: 2px;
-  background: #ffffff;
+  background: var(--emerald);
   border-radius: 2px;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+}
+
+/* Accessible keyboard focus ring: visible on Tab navigation */
+.vita-nav .nav-link:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Suppress default browser outline on click while preserving keyboard accessibility */
+.vita-nav .nav-link:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* Right Actions */
@@ -224,6 +244,39 @@ code, pre {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  transition: all 0.2s ease;
+}
+
+.vita-network-badge.is-wrong-network {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.dropdown-switch-network-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: all 0.15s ease;
+}
+
+.dropdown-switch-network-action:hover {
+  background: rgba(245, 158, 11, 0.25);
+  color: #ffffff;
+}
+
+.dropdown-network-name.warning {
+  color: #fbbf24;
 }
 
 .network-dot {
@@ -1740,6 +1793,7 @@ code, pre {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 1.75rem;
+  align-items: start; /* Natural card heights: cards hug content instead of stretching */
 }
 
 .panel {
@@ -1749,6 +1803,9 @@ code, pre {
   padding: 1.75rem;
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
+  container-name: panel;
+  box-sizing: border-box;
 }
 
 .panel-header {
@@ -2308,8 +2365,45 @@ code, pre {
   flex: 0 0 auto;
   white-space: nowrap;
   min-width: 145px;
+  min-height: 40px;
   text-align: center;
-  padding: 0.65rem 1.15rem;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.action-row-cancel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.cancel-action-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+@container panel (max-width: 480px) {
+  .action-row,
+  .cancel-action-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+  .action-row-btn {
+    width: 100%;
+  }
+  .inline-reg-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .inline-reg-row .action-row-btn {
+    width: 100%;
+  }
 }
 
 .tender-summary-box {
@@ -2360,6 +2454,7 @@ code, pre {
 /* Secondary Officer Grid */
 .secondary-officer-grid {
   margin-top: 1.75rem;
+  align-items: start; /* Natural card height: Milestone card hugs content */
 }
 
 .registrar-controls {
@@ -2416,6 +2511,7 @@ code, pre {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
+  align-items: start; /* Natural card height: balance and milestone cards hug content */
 }
 
 .pull-card, .milestone-submit-card {
@@ -3070,11 +3166,22 @@ input[type="file"]::file-selector-button:hover {
     margin-bottom: 0;
   }
   .bidder-grid,
-  .officer-grid {
+  .officer-grid,
+  .secondary-officer-grid {
     grid-template-columns: 1fr;
   }
   .financials-split {
     grid-template-columns: 1fr;
+  }
+  .action-row,
+  .cancel-action-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+  .action-row .btn,
+  .action-row-btn {
+    width: 100%;
   }
   .vita-headline {
     font-size: 1.8rem;

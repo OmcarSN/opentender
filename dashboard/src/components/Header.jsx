@@ -57,20 +57,26 @@ export default function Header({
       </div>
 
       {/* Navigation Links */}
-      <nav className="vita-nav">
+      <nav className="vita-nav" role="tablist" aria-label="Main Navigation">
         <button
+          role="tab"
+          aria-selected={activeTab === "audit"}
           className={`nav-link ${activeTab === "audit" ? "active" : ""}`}
           onClick={() => onTabChange("audit")}
         >
           Public Audit
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === "bidder"}
           className={`nav-link ${activeTab === "bidder" ? "active" : ""}`}
           onClick={() => onTabChange("bidder")}
         >
           Bidder Portal
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === "officer"}
           className={`nav-link ${activeTab === "officer" ? "active" : ""}`}
           onClick={() => onTabChange("officer")}
         >
@@ -81,11 +87,25 @@ export default function Header({
       {/* Right Actions: Network & Wallet */}
       <div className="vita-actions">
         {/* Network indicator */}
-        <div className="vita-network-badge">
+        <div
+          className={`vita-network-badge ${!isCorrectNetwork ? "is-wrong-network" : ""}`}
+          title={
+            isCorrectNetwork
+              ? `Connected to ${CHAIN_NAME} (Chain ID: ${CHAIN_ID})`
+              : `Wrong network. Click Switch to connect to ${CHAIN_NAME} (Chain ID: ${CHAIN_ID})`
+          }
+        >
           <span className={`network-dot ${isCorrectNetwork ? "online" : "warning"}`} />
-          <span className="network-name">{isCorrectNetwork ? CHAIN_NAME : "Switch Network"}</span>
+          <span className="network-name">
+            {isCorrectNetwork ? CHAIN_NAME : `Switch to ${CHAIN_NAME}`}
+          </span>
           {!isCorrectNetwork && (
-            <button className="btn-switch-mini" onClick={onSwitchNetwork}>
+            <button
+              className="btn-switch-mini"
+              onClick={onSwitchNetwork}
+              title={`Switch network to ${CHAIN_NAME}`}
+              aria-label={`Switch network to ${CHAIN_NAME}`}
+            >
               Switch
             </button>
           )}
@@ -135,8 +155,24 @@ export default function Header({
                       <span className="dropdown-indicator online" />
                       <span className="dropdown-wallet-name">{activeWalletName || "Connected Wallet"}</span>
                     </div>
-                    <span className="dropdown-network-name">{isCorrectNetwork ? CHAIN_NAME : "Wrong Network"}</span>
+                    <span className={`dropdown-network-name ${!isCorrectNetwork ? "warning" : ""}`}>
+                      {isCorrectNetwork ? CHAIN_NAME : `Expected: ${CHAIN_NAME}`}
+                    </span>
                   </div>
+
+                  {!isCorrectNetwork && (
+                    <button
+                      className="dropdown-switch-network-action"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onSwitchNetwork) onSwitchNetwork();
+                      }}
+                      title={`Switch to ${CHAIN_NAME}`}
+                    >
+                      <span className="network-dot warning" />
+                      <span>Switch to {CHAIN_NAME}</span>
+                    </button>
+                  )}
 
                   <div className="dropdown-address-box">
                     <span className="dropdown-address-text font-mono">
