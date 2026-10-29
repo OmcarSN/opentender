@@ -7,6 +7,9 @@ export const CHAIN_ID = parseInt(import.meta.env.VITE_CHAIN_ID || "91562037", 10
 export const CHAIN_NAME = import.meta.env.VITE_CHAIN_NAME || "MST Testnet";
 export const CURRENCY_SYMBOL = import.meta.env.VITE_CURRENCY_SYMBOL || "tMSTC";
 export const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL || "https://testnet.mstscan.com";
+export const DEMO_VERIFIERS =
+  import.meta.env.VITE_DEMO_VERIFIERS ||
+  "0xF96F5EBC048B8A0d7c9abE2926fda6cc9cC1AD93, 0x88667C745272bCb1f45001ac97a4E521cD5a168c";
 
 export const OpenTenderABI = OpenTenderABIJson;
 

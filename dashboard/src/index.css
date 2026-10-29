@@ -3344,3 +3344,40 @@ input[type="file"]::file-selector-button:hover {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+/* Milestone Plain-Text Schedule Display (Step 3) */
+.milestone-plain-text-box {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.milestone-step-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.milestone-step-item:last-child {
+  border-bottom: none;
+}
+
+.milestone-step-num {
+  font-weight: 600;
+  color: #f1f5f9;
+  min-width: 90px;
+}
+
+.milestone-step-due strong,
+.milestone-step-share strong {
+  color: #38bdf8;
+}

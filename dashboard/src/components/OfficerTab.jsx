@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { ethers } from "ethers";
-import { CURRENCY_SYMBOL, CHAIN_ID, getReadOnlyContract } from "../config";
+import { CURRENCY_SYMBOL, CHAIN_ID, DEMO_VERIFIERS, getReadOnlyContract } from "../config";
 import { parseContractError } from "../utils/errors";
 
 const STATUS_NAMES = [
@@ -56,17 +56,15 @@ export default function OfficerTab({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Department: Create Tender Form State
-  const [ceilingPrice, setCeilingPrice] = useState("50");
-  const [bidBond, setBidBond] = useState("2");
+  const [ceilingPrice, setCeilingPrice] = useState("0.02");
+  const [bidBond, setBidBond] = useState("0.002");
   const [commitMins, setCommitMins] = useState("3");
   const [revealMins, setRevealMins] = useState("3");
   const [escrowHours, setEscrowHours] = useState("1");
-  const [graceHours, setGraceHours] = useState("24");
+  const [graceHours, setGraceHours] = useState("1");
   const [penaltyBps, setPenaltyBps] = useState("200");
   const [docHash, setDocHash] = useState("MST_BUILDATHON_PROCUREMENT_V1");
-  const [verifiersText, setVerifiersText] = useState(
-    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC, 0x90F79bf6EB2c4f870365E785982E1f101E93b906"
-  );
+  const [verifiersText, setVerifiersText] = useState(DEMO_VERIFIERS);
   const [threshold, setThreshold] = useState("2");
 
   // Lifecycle control state
@@ -350,17 +348,15 @@ export default function OfficerTab({
 
   // Pre-fill demo values (Never triggers a transaction automatically)
   function handleFillDemo() {
-    setCeilingPrice("50");
-    setBidBond("2");
+    setCeilingPrice("0.02");
+    setBidBond("0.002");
     setCommitMins("3");
     setRevealMins("3");
     setEscrowHours("1");
-    setGraceHours("24");
+    setGraceHours("1");
     setPenaltyBps("200");
     setDocHash("LIVE_BUILDATHON_DEMO_SPEC");
-    setVerifiersText(
-      "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC, 0x90F79bf6EB2c4f870365E785982E1f101E93b906"
-    );
+    setVerifiersText(DEMO_VERIFIERS);
     setThreshold("2");
   }
 
@@ -382,10 +378,11 @@ export default function OfficerTab({
       const escrowWindow = parsedEscrowHours * 3600;
       const gracePeriod = parsedGraceHours * 3600;
 
-      // Default to 2 milestones: 50% and 50%
+      // 3 milestones: 30%, 30%, 40% with due dates relative to reveal deadline (+20m, +40m, +60m)
       const milestones = [
-        { percentageBps: 5000, dueDate: revealDeadline + 86400 * 5 },
-        { percentageBps: 5000, dueDate: revealDeadline + 86400 * 10 }
+        { percentageBps: 3000, dueDate: revealDeadline + 20 * 60 },
+        { percentageBps: 3000, dueDate: revealDeadline + 40 * 60 },
+        { percentageBps: 4000, dueDate: revealDeadline + 60 * 60 }
       ];
 
       const documentHash =
@@ -820,7 +817,7 @@ export default function OfficerTab({
                 rows="2"
                 value={verifiersText}
                 onChange={(e) => setVerifiersText(e.target.value)}
-                placeholder="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC, 0x90F79bf6EB2c4f870365E785982E1f101E93b906"
+                placeholder={DEMO_VERIFIERS}
                 required
               />
               <div className="field-hint">
@@ -863,6 +860,30 @@ export default function OfficerTab({
                   Threshold must be between 1 and the number of valid verifiers ({verifierAddresses.length}).
                 </div>
               )}
+            </div>
+
+            <div className="form-group">
+              <label>Milestone Delivery Schedule &amp; Payout Shares</label>
+              <div className="milestone-plain-text-box">
+                <div className="milestone-step-item">
+                  <span className="milestone-step-num">Milestone 1</span>
+                  <span className="milestone-step-due">Due at <strong>+20 minutes</strong> from reveal deadline</span>
+                  <span className="milestone-step-share">Payout share: <strong>30%</strong></span>
+                </div>
+                <div className="milestone-step-item">
+                  <span className="milestone-step-num">Milestone 2</span>
+                  <span className="milestone-step-due">Due at <strong>+40 minutes</strong> from reveal deadline</span>
+                  <span className="milestone-step-share">Payout share: <strong>30%</strong></span>
+                </div>
+                <div className="milestone-step-item">
+                  <span className="milestone-step-num">Milestone 3</span>
+                  <span className="milestone-step-due">Due at <strong>+60 minutes</strong> from reveal deadline</span>
+                  <span className="milestone-step-share">Payout share: <strong>40%</strong></span>
+                </div>
+              </div>
+              <div className="field-hint">
+                Milestone due dates are set relative to the reveal deadline. Escrow funds are released progressively upon verification.
+              </div>
             </div>
 
             <button
