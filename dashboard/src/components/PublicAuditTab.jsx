@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { CURRENCY_SYMBOL, EXPLORER_URL } from "../config";
+import { CURRENCY_SYMBOL, EXPLORER_URL, CHAIN_NAME } from "../config";
 import { getTenderMeta } from "../utils/tenderMeta";
 import { parseContractError } from "../utils/errors";
 
@@ -141,8 +141,8 @@ export default function PublicAuditTab({
     if (q) {
       const matchTitle = meta.title.toLowerCase().includes(q);
       const matchDept = (t.department || "").toLowerCase().includes(q);
-      const matchLoc = meta.location.toLowerCase().includes(q);
-      if (!matchTitle && !matchDept && !matchLoc) return false;
+      const matchId = `tender #${t.id}`.includes(q) || t.id.toString() === q;
+      if (!matchTitle && !matchDept && !matchId) return false;
     }
     return true;
   });
@@ -222,39 +222,46 @@ export default function PublicAuditTab({
       <section className="vita-hero">
         <div className="vita-kicker">
           <span className="kicker-symbol">✻</span>
-          <span>Public Tenders Catalog</span>
+          <span>Verified On-Chain Procurement</span>
         </div>
         <h1 className="vita-headline">
-          <span className="headline-bold">Explore tenders</span>{" "}
-          <span className="headline-muted">we’ve personally vetted across 100+ departments worldwide</span>
+          <span className="headline-bold">Public tenders</span>{" "}
+          <span className="headline-muted">with sealed bids and verified payments</span>
         </h1>
+        <p className="vita-subline">
+          OpenTender enforces cryptographic commit-reveal bidding, anti-collusion group rules, and multi-verifier milestone escrow payouts on-chain.
+        </p>
 
-        {/* Horizontal Segmented Search/Booking Bar */}
+        {/* Horizontal Segmented Status & Network Bar */}
         <div className="vita-filter-bar">
           <div className="filter-segment">
-            <span className="segment-label">Sector / Category</span>
-            <span className="segment-value">Digital, Works, IT</span>
+            <span className="segment-label">Network</span>
+            <span className="segment-value">{CHAIN_NAME}</span>
           </div>
 
           <div className="segment-divider" />
 
           <div className="filter-segment">
-            <span className="segment-label">Authority / Network</span>
-            <span className="segment-value">MST Municipal Chain</span>
+            <span className="segment-label">Status Filter</span>
+            <span className="segment-value">
+              {categoryFilter === "all" ? "All Phases" : categoryFilter === "commit" ? "Commit Phase" : categoryFilter === "funded" ? "Milestone Escrow" : "Completed"}
+            </span>
           </div>
 
           <div className="segment-divider" />
 
           <div className="filter-segment">
-            <span className="segment-label">Phase / Timeline</span>
-            <span className="segment-value">Active Commit &amp; Reveal</span>
+            <span className="segment-label">Ceiling Range</span>
+            <span className="segment-value">
+              {scaleFilter === "all" ? `Any (${CURRENCY_SYMBOL})` : scaleFilter === "enterprise" ? `> 50 ${CURRENCY_SYMBOL}` : scaleFilter === "medium" ? `10–50 ${CURRENCY_SYMBOL}` : `< 10 ${CURRENCY_SYMBOL}`}
+            </span>
           </div>
 
           <div className="segment-divider" />
 
           <div className="filter-segment">
-            <span className="segment-label">Ceiling Budget</span>
-            <span className="segment-value">0 – 100 MSTC</span>
+            <span className="segment-label">Settlement</span>
+            <span className="segment-value">Multi-Verifier Escrow</span>
           </div>
 
           {/* Crisp White Action Button */}
@@ -265,7 +272,7 @@ export default function PublicAuditTab({
               setScaleFilter("all");
             }}
           >
-            Explore
+            Reset Filters
           </button>
         </div>
       </section>
@@ -383,15 +390,20 @@ export default function PublicAuditTab({
                     <span className="card-phase-overlay">
                       {getTenderPhase(tender).toUpperCase()}
                     </span>
+                    {meta.isDemo && (
+                      <span className="card-demo-badge">Demo tender</span>
+                    )}
                   </div>
 
                   {/* Middle Content Metadata */}
                   <div className="card-main-meta">
-                    {/* Rating row */}
-                    <div className="card-rating-row">
-                      <span className="rating-score">{meta.rating}</span>
-                      <span className="rating-stars">★★★★★</span>
-                      <span className="rating-reviews">{meta.reviewsCount} verified audits</span>
+                    {/* Header Tag Row: Tender ID & Demo Tag */}
+                    <div className="card-tag-row">
+                      <span className="card-id-tag">Tender #{tender.id}</span>
+                      <span className="status-badge-inline">{statusText}</span>
+                      {meta.isDemo && (
+                        <span className="demo-pill-label">Demo tender</span>
+                      )}
                     </div>
 
                     {/* Big Title */}
@@ -399,29 +411,47 @@ export default function PublicAuditTab({
                       {meta.title}
                     </h2>
 
-                    {/* Department / Location */}
+                    {/* Department / Authority */}
                     <div className="card-spec-row">
-                      <span className="spec-label">Location:</span>
-                      <span className="spec-text">{meta.location}</span>
-                    </div>
-
-                    {/* Dates / Timeline */}
-                    <div className="card-spec-row">
-                      <span className="spec-label">Phase:</span>
-                      <span className="spec-text">
-                        {getTenderPhase(tender) === "Commit Phase"
-                          ? `Commit Phase (closes in ${formatCountdown(tender.commitDeadline)}) · Bond: ${bondFormatted} ${CURRENCY_SYMBOL}`
-                          : getTenderPhase(tender) === "Reveal Phase"
-                          ? `Reveal Phase (closes in ${formatCountdown(tender.revealDeadline)}) · Bond: ${bondFormatted} ${CURRENCY_SYMBOL}`
-                          : `${getTenderPhase(tender)} · Bond: ${bondFormatted} ${CURRENCY_SYMBOL}`}
+                      <span className="spec-label">AUTHORITY:</span>
+                      <span className="spec-text font-mono">
+                        {tender.department ? `${tender.department.slice(0, 10)}...${tender.department.slice(-8)}` : "None"}
                       </span>
                     </div>
 
-                    {/* Capacity / Verifiers */}
+                    {/* Phase / Countdown */}
                     <div className="card-spec-row">
-                      <span className="spec-label">Audit:</span>
+                      <span className="spec-label">PHASE:</span>
                       <span className="spec-text">
-                        2-of-2 Multi-Verifier Threshold · Anti-Collusion Group Protected
+                        {getTenderPhase(tender) === "Commit Phase"
+                          ? `Commit Phase (closes in ${formatCountdown(tender.commitDeadline)})`
+                          : getTenderPhase(tender) === "Reveal Phase"
+                          ? `Reveal Phase (closes in ${formatCountdown(tender.revealDeadline)})`
+                          : getTenderPhase(tender)}
+                      </span>
+                    </div>
+
+                    {/* Bond Deposit */}
+                    <div className="card-spec-row">
+                      <span className="spec-label">BID BOND:</span>
+                      <span className="spec-text">
+                        {bondFormatted} {CURRENCY_SYMBOL} (locked until award or reveal)
+                      </span>
+                    </div>
+
+                    {/* Verifiers Threshold */}
+                    <div className="card-spec-row">
+                      <span className="spec-label">VERIFIERS:</span>
+                      <span className="spec-text">
+                        {tender.approvalThreshold || 2}-of-N Approval Threshold required
+                      </span>
+                    </div>
+
+                    {/* Count of Commits */}
+                    <div className="card-spec-row">
+                      <span className="spec-label">COMMITS:</span>
+                      <span className="spec-text">
+                        {tender.totalCommits !== undefined ? `${tender.totalCommits} sealed ${tender.totalCommits === 1 ? "bid" : "bids"} submitted` : "0 sealed bids submitted"}
                       </span>
                     </div>
                   </div>
@@ -429,7 +459,7 @@ export default function PublicAuditTab({
                   {/* Right Pricing & Actions */}
                   <div className="card-actions-column">
                     <div className="price-block">
-                      <span className="price-label">from</span>
+                      <span className="price-label">Ceiling Budget</span>
                       <span className="price-value">{parseFloat(ceilingFormatted).toLocaleString()} {CURRENCY_SYMBOL}</span>
                     </div>
 
@@ -461,8 +491,11 @@ export default function PublicAuditTab({
           <div className="modal-dialog audit-detail-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h3>{activeMeta?.title || `Tender #${selectedTenderId}`}</h3>
-                <span className="modal-subtitle">Contract: <code>{tenderDetails.department}</code></span>
+                <h3>
+                  {activeMeta?.title || `Tender #${selectedTenderId}`}
+                  {activeMeta?.isDemo && <span className="demo-pill-label modal-demo-pill">Demo tender</span>}
+                </h3>
+                <span className="modal-subtitle">Tender #{selectedTenderId} · Department: <code>{tenderDetails.department}</code></span>
               </div>
               <button className="btn-close" onClick={() => setShowDetailModal(false)}>×</button>
             </div>

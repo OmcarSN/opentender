@@ -333,7 +333,7 @@ code, pre {
 .vita-headline {
   font-size: 2.5rem;
   line-height: 1.18;
-  margin-bottom: 1.85rem;
+  margin-bottom: 1rem;
   letter-spacing: -0.03em;
 }
 
@@ -345,6 +345,14 @@ code, pre {
 .headline-muted {
   color: var(--text-muted);
   font-weight: 400;
+}
+
+.vita-subline {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  max-width: 820px;
+  line-height: 1.5;
+  margin-bottom: 1.85rem;
 }
 
 /* ==========================================================================
@@ -611,6 +619,22 @@ code, pre {
   text-transform: uppercase;
 }
 
+.card-demo-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(11, 20, 19, 0.82);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* Middle Metadata */
 .card-main-meta {
   flex: 1;
@@ -620,6 +644,52 @@ code, pre {
   gap: 0.35rem;
   min-width: 0;
   overflow: hidden;
+}
+
+.card-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+  flex-wrap: wrap;
+}
+
+.card-id-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--emerald-light);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.status-badge-inline {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.demo-pill-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.modal-demo-pill {
+  margin-left: 0.65rem;
+  vertical-align: middle;
+  font-size: 0.68rem;
 }
 
 .card-rating-row {

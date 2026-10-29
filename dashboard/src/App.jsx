@@ -132,6 +132,8 @@ export default function App() {
             status: Number(t.status),
             winningBidder: t.winningBidder,
             winningAmount: t.winningAmount,
+            approvalThreshold: Number(t.approvalThreshold),
+            totalCommits: Number(t.totalCommits),
           });
         } catch (e) {
           console.warn(`Error loading tender #${i}:`, e);
