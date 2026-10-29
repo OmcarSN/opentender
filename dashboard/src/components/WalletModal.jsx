@@ -5,6 +5,17 @@ import metamaskLogo from "../assets/metamask.png";
 function WalletLogo({ walletId, detectedIcon, name }) {
   const [imgError, setImgError] = useState(false);
 
+  // Exact official MetaMask logo provided by user - prioritize to ensure clean official vector display
+  if (walletId === "metamask") {
+    return (
+      <img
+        src={metamaskLogo}
+        alt="MetaMask"
+        className="web3-wallet-logo-img metamask-fox-img"
+      />
+    );
+  }
+
   // If wallet extension provides high-res icon, use it
   if (detectedIcon && !imgError) {
     return (
@@ -13,17 +24,6 @@ function WalletLogo({ walletId, detectedIcon, name }) {
         alt={name || walletId}
         className="web3-wallet-logo-img"
         onError={() => setImgError(true)}
-      />
-    );
-  }
-
-  // Exact official MetaMask logo provided by user
-  if (walletId === "metamask") {
-    return (
-      <img
-        src={metamaskLogo}
-        alt="MetaMask"
-        className="web3-wallet-logo-img metamask-fox-img"
       />
     );
   }

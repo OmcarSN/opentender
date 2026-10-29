@@ -30,7 +30,10 @@ export default function PublicAuditTab({
   signer,
   onSwitchToBidder,
   searchQuery = "",
-  latestBlockTimestamp = 0
+  latestBlockTimestamp = 0,
+  isDataLoading = false,
+  dataLoadError = null,
+  onRetry = null
 }) {
   const [blockTimestamp, setBlockTimestamp] = useState(latestBlockTimestamp || 0);
   const [categoryFilter, setCategoryFilter] = useState(() => {
@@ -239,6 +242,24 @@ export default function PublicAuditTab({
 
   return (
     <div className="vita-catalog-container">
+      {/* Top Banner when blockchain RPC is unreachable */}
+      {dataLoadError && (
+        <div className="blockchain-error-banner" role="alert">
+          <div className="banner-content">
+            <span className="banner-icon">⚠️</span>
+            <div className="banner-text-wrap">
+              <strong>Can't reach the blockchain right now</strong>
+              <span className="banner-subtext">Unable to query RPC endpoint ({CHAIN_NAME}). Verified on-chain data cannot be loaded.</span>
+            </div>
+          </div>
+          {onRetry && (
+            <button className="banner-retry-btn" onClick={onRetry}>
+              Retry Connection
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Hero Section matching VITA Dribbble design */}
       <section className="vita-hero">
         <div className="vita-kicker">
@@ -391,7 +412,30 @@ export default function PublicAuditTab({
 
         {/* Right Cards Catalog List */}
         <main className="vita-cards-list">
-          {filteredTenders.length === 0 ? (
+          {dataLoadError ? (
+            <div className="empty-catalog-card error-state-card">
+              <div className="empty-catalog-icon error-icon">⚠️</div>
+              <h3>Can't reach the blockchain right now</h3>
+              <p>We're unable to reach the blockchain RPC node right now. Please check your network connection or verify that the RPC endpoint is online.</p>
+              {onRetry && (
+                <button className="empty-reset-btn" onClick={onRetry}>
+                  Retry Connection
+                </button>
+              )}
+            </div>
+          ) : isDataLoading && tenders.length === 0 ? (
+            <div className="empty-catalog-card loading-state-card">
+              <div className="empty-catalog-icon loading-spin">⏳</div>
+              <h3>Loading tenders from blockchain...</h3>
+              <p>Reading verified procurement contracts via read-only public RPC.</p>
+            </div>
+          ) : tenders.length === 0 ? (
+            <div className="empty-catalog-card">
+              <div className="empty-catalog-icon">📋</div>
+              <h3>No tenders yet</h3>
+              <p>No procurement tenders have been published on-chain yet.</p>
+            </div>
+          ) : filteredTenders.length === 0 ? (
             <div className="empty-catalog-card">
               <div className="empty-catalog-icon">✻</div>
               <h3>No tenders match your filter</h3>
@@ -401,6 +445,7 @@ export default function PublicAuditTab({
                 onClick={() => {
                   setCategoryFilter("all");
                   setScaleFilter("all");
+                  setSearchFilter("");
                 }}
               >
                 Reset Filters

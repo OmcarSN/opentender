@@ -3246,3 +3246,101 @@ input[type="file"]::file-selector-button:hover {
     align-items: flex-start;
   }
 }
+
+/* ==========================================================================
+   Blockchain Error Banner & States (Strict Requirement 4 & 5)
+   ========================================================================== */
+.blockchain-error-banner {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(185, 28, 28, 0.25) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15);
+  animation: slideDownFade 0.25s ease-out;
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.blockchain-error-banner .banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.blockchain-error-banner .banner-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.blockchain-error-banner .banner-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.blockchain-error-banner .banner-text-wrap strong {
+  color: #fca5a5;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.blockchain-error-banner .banner-subtext {
+  color: rgba(254, 202, 202, 0.85);
+  font-size: 0.825rem;
+  line-height: 1.35;
+}
+
+.blockchain-error-banner .banner-retry-btn {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffffff;
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.blockchain-error-banner .banner-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.4);
+  border-color: #ef4444;
+}
+
+.empty-catalog-card.error-state-card {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.empty-catalog-card.error-state-card .error-icon {
+  font-size: 2.25rem;
+  color: #ef4444;
+}
+
+.empty-catalog-card.loading-state-card .loading-spin {
+  font-size: 2.25rem;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

@@ -144,7 +144,7 @@ export default function App() {
         count = Number(countBig);
       } catch (err) {
         console.warn("Could not query tenderCount from contract:", err);
-        setDataLoadError("Unable to reach contract on configured RPC endpoint.");
+        setDataLoadError("Can't reach the blockchain right now");
       }
 
       const loadedTenders = [];
@@ -251,7 +251,7 @@ export default function App() {
       }
     } catch (err) {
       console.warn("Read-only contract load notice:", err);
-      setDataLoadError("Could not connect to contract. Please verify RPC endpoint.");
+      setDataLoadError("Can't reach the blockchain right now");
     } finally {
       setIsDataLoading(false);
     }
@@ -469,6 +469,9 @@ export default function App() {
               onSwitchToBidder={handleSwitchToBidder}
               searchQuery={searchQuery}
               latestBlockTimestamp={latestBlockTimestamp}
+              isDataLoading={isDataLoading}
+              dataLoadError={dataLoadError}
+              onRetry={loadContractData}
             />
           )}
 

@@ -41,8 +41,13 @@ module.exports = {
       chainId: 31337,
     },
     mstTestnet: {
-      url: process.env.MST_RPC_URL || "https://testnet-rpc.mstblockchain.com",
-      chainId: Number(process.env.MST_CHAIN_ID || 4545),
+      url: process.env.MST_RPC_URL || "https://testnetrpc.mstblockchain.com",
+      chainId: Number(process.env.MST_CHAIN_ID || 91562037),
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+    },
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
+      chainId: 11155111,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
     },
   },

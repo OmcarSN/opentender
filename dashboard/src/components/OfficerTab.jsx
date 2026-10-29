@@ -106,6 +106,25 @@ export default function OfficerTab({
     return tenders.find((t) => Number(t.id) === Number(verifyTenderId)) || null;
   }, [verifyTenderId, tenders]);
 
+  // Auto pre-select latest relevant tender so dropdowns are never blank
+  useEffect(() => {
+    if (tenders.length > 0) {
+      const exists = tenders.some((t) => Number(t.id) === Number(actionTenderId));
+      if (!actionTenderId || !exists) {
+        setActionTenderId(Number(tenders[tenders.length - 1].id));
+      }
+    }
+  }, [tenders, actionTenderId]);
+
+  useEffect(() => {
+    if (fundedTenders.length > 0) {
+      const exists = fundedTenders.some((t) => Number(t.id) === Number(verifyTenderId));
+      if (!verifyTenderId || !exists) {
+        setVerifyTenderId(Number(fundedTenders[fundedTenders.length - 1].id));
+      }
+    }
+  }, [fundedTenders, verifyTenderId]);
+
   // Authorization flags
   const isDeptRole = Boolean(roles?.isDepartment);
   const isVerifierRole = Boolean(roles?.isVerifier);

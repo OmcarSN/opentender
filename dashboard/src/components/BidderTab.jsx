@@ -106,6 +106,43 @@ export default function BidderTab({
   const selectedRevealTender = tenders.find((t) => t.id === Number(revealTenderId));
   const selectedMilestoneTender = tenders.find((t) => t.id === Number(milestoneTenderId));
 
+  // Auto pre-select latest relevant tender for all forms so dropdowns are never blank
+  useEffect(() => {
+    if (commitEligibleTenders.length > 0) {
+      const exists = commitEligibleTenders.some((t) => String(t.id) === String(commitTenderId));
+      if (!commitTenderId || !exists) {
+        setCommitTenderId(String(commitEligibleTenders[commitEligibleTenders.length - 1].id));
+      }
+    }
+  }, [commitEligibleTenders, commitTenderId]);
+
+  useEffect(() => {
+    if (revealEligibleTenders.length > 0) {
+      const exists = revealEligibleTenders.some((t) => String(t.id) === String(revealTenderId));
+      if (!revealTenderId || !exists) {
+        setRevealTenderId(String(revealEligibleTenders[revealEligibleTenders.length - 1].id));
+      }
+    }
+  }, [revealEligibleTenders, revealTenderId]);
+
+  useEffect(() => {
+    if (refundEligibleTenders.length > 0) {
+      const exists = refundEligibleTenders.some((t) => String(t.id) === String(refundTenderId));
+      if (!refundTenderId || !exists) {
+        setRefundTenderId(String(refundEligibleTenders[refundEligibleTenders.length - 1].id));
+      }
+    }
+  }, [refundEligibleTenders, refundTenderId]);
+
+  useEffect(() => {
+    if (milestoneEligibleTenders.length > 0) {
+      const exists = milestoneEligibleTenders.some((t) => String(t.id) === String(milestoneTenderId));
+      if (!milestoneTenderId || !exists) {
+        setMilestoneTenderId(String(milestoneEligibleTenders[milestoneEligibleTenders.length - 1].id));
+      }
+    }
+  }, [milestoneEligibleTenders, milestoneTenderId]);
+
   // =========================================================================
   // Validations: Commit Sealed Bid
   // =========================================================================
