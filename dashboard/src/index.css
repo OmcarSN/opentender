@@ -276,6 +276,43 @@ code, pre {
 .pill-gold { background: rgba(245, 158, 11, 0.18); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.35); }
 
 /* Connected Wallet Pill & Dropdown */
+.vita-wallet-connected-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.vita-btn-disconnect-direct {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: 9999px;
+  color: #fca5a5;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.vita-btn-disconnect-direct:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.3);
+  transform: translateY(-1px);
+}
+
+.vita-btn-disconnect-direct:active {
+  transform: translateY(0);
+}
+
 .vita-wallet-wrapper {
   position: relative;
   display: inline-block;
