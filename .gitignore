@@ -14,6 +14,7 @@ dist/
 dashboard/dist/
 coverage/
 coverage.json
+deployments/
 artifacts/
 cache/
 .cache/
