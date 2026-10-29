@@ -3,6 +3,8 @@
 > **Sealed-Bid Public Procurement & Milestone-Escrow Smart Contract Suite**  
 > *Developed for MST Blockchain BUILDATHON #2*
 
+🌐 **Live Application Deployment**: [https://opentender-lior.vercel.app/?tab=audit](https://opentender-lior.vercel.app/?tab=audit)
+
 OpenTender is an institutional-grade decentralized e-procurement suite providing end-to-end fairness, sealed-bid privacy, conflict-of-interest prevention, and escrow-backed milestone payouts with automated late penalty calculations on the MST Blockchain.
 
 ---
@@ -91,4 +93,13 @@ npm run demo
 Ensure `.env` has your `DEPLOYER_PRIVATE_KEY`:
 ```bash
 npm run demo:live
+```
+
+### 7. Frontend Web Dashboard
+- **Production URL**: [https://opentender-lior.vercel.app/?tab=audit](https://opentender-lior.vercel.app/?tab=audit)
+- **Local Dev Server**:
+```bash
+cd dashboard
+npm install
+npm run dev
 ```
