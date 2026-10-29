@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import OpenTenderArtifact from "../../artifacts/contracts/OpenTender.sol/OpenTender.json";
+import OpenTenderABIJson from "./abi/OpenTenderABI.json";
 
 export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82";
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545";
@@ -8,7 +8,7 @@ export const CHAIN_NAME = import.meta.env.VITE_CHAIN_NAME || "Hardhat Localhost"
 export const CURRENCY_SYMBOL = import.meta.env.VITE_CURRENCY_SYMBOL || "ETH";
 export const EXPLORER_URL = import.meta.env.VITE_EXPLORER_URL || "";
 
-export const OpenTenderABI = OpenTenderArtifact.abi;
+export const OpenTenderABI = OpenTenderABIJson;
 
 // Read-only provider for public audit tab (requires zero wallet connection)
 export function getReadOnlyProvider() {
