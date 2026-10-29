@@ -34,7 +34,7 @@ export default function App() {
   const [showWalletModal, setShowWalletModal] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search);
-      return p.get("walletModal") === "true";
+      return p.get("walletModal") === "true" || p.get("connect") === "true";
     } catch {
       return false;
     }
