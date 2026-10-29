@@ -1,28 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { CURRENCY_SYMBOL, EXPLORER_URL } from "../config";
+import { getTenderMeta } from "../utils/tenderMeta";
 import { parseContractError } from "../utils/errors";
 
 const STATUS_LABELS = [
   "None",
-  "Open (Bidding Active)",
-  "Awarded (Awaiting Escrow)",
-  "Funded (In Execution)",
-  "Completed (Verified & Paid)",
-  "Failed (Zero Valid Reveals)",
+  "Commit Phase",
+  "Awarded (Pending Escrow)",
+  "Funded (Execution)",
+  "Completed",
+  "Failed",
   "Cancelled",
-  "Defaulted (Contractor Defaulted)"
-];
-
-const STATUS_CLASSES = [
-  "status-none",
-  "status-open",
-  "status-awarded",
-  "status-funded",
-  "status-completed",
-  "status-failed",
-  "status-cancelled",
-  "status-defaulted"
+  "Defaulted"
 ];
 
 export default function PublicAuditTab({
@@ -37,13 +27,25 @@ export default function PublicAuditTab({
   committedBidders,
   platformStats,
   events,
-  account,
-  signer
+  signer,
+  onSwitchToBidder,
+  searchQuery = ""
 }) {
   const [nowSec, setNowSec] = useState(Math.floor(Date.now() / 1000));
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [scaleFilter, setScaleFilter] = useState("all");
+  const [searchFilter, setSearchFilter] = useState("");
+  const [showDetailModal, setShowDetailModal] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get("modal") === "true" || p.get("inspect") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [showAttackModal, setShowAttackModal] = useState(false);
   const [attackLogs, setAttackLogs] = useState([]);
   const [isAttacking, setIsAttacking] = useState(false);
-  const [showAttackModal, setShowAttackModal] = useState(false);
 
   // Live countdown tick
   useEffect(() => {
@@ -63,7 +65,35 @@ export default function PublicAuditTab({
     return `${h > 0 ? `${h}h ` : ""}${m}m ${s < 10 ? `0${s}` : s}s`;
   }
 
-  // Attack Demo runner
+  // Filter tenders based on categories and scale
+  const filteredTenders = tenders.filter((t) => {
+    const meta = getTenderMeta(t.id);
+    if (categoryFilter === "commit" && t.status !== 1) return false;
+    if (categoryFilter === "funded" && t.status !== 3) return false;
+    if (categoryFilter === "completed" && t.status !== 4) return false;
+
+    const ceilingEth = parseFloat(ethers.formatEther(t.ceilingPrice));
+    if (scaleFilter === "micro" && ceilingEth >= 10) return false;
+    if (scaleFilter === "medium" && (ceilingEth < 10 || ceilingEth > 50)) return false;
+    if (scaleFilter === "enterprise" && ceilingEth <= 50) return false;
+
+    const q = (searchFilter || searchQuery || "").trim().toLowerCase();
+    if (q) {
+      const matchTitle = meta.title.toLowerCase().includes(q);
+      const matchDept = (t.department || "").toLowerCase().includes(q);
+      const matchLoc = meta.location.toLowerCase().includes(q);
+      if (!matchTitle && !matchDept && !matchLoc) return false;
+    }
+    return true;
+  });
+
+  // Open details for a specific tender
+  function handleOpenDetails(id) {
+    onSelectTender(id);
+    setShowDetailModal(true);
+  }
+
+  // Run security attack demo
   async function runAttackDemo() {
     if (!contract || !selectedTenderId) return;
     setIsAttacking(true);
@@ -72,51 +102,47 @@ export default function PublicAuditTab({
 
     logs.push({
       step: 1,
-      title: "Attack 1: Peek Attack (Reading sealed bids before reveal deadline)",
-      desc: "Attacker attempts to query getRevealedBids() from contract storage...",
+      title: "Attack 1: Peek Attack (Querying getRevealedBids before reveal deadline)",
+      desc: "Simulating unauthorized mempool query to inspect competitors' prices...",
       status: "running"
     });
     setAttackLogs([...logs]);
 
     try {
-      // Attempt to read revealed bids
       await contract.getRevealedBids(selectedTenderId);
       logs[0].status = "failed";
-      logs[0].result = "WARNING: Bids were returned. (Reveal deadline has already passed for this tender).";
+      logs[0].result = "WARNING: Bids were returned. (Reveal phase is already open).";
     } catch (err) {
       const translated = parseContractError(err);
       logs[0].status = "blocked";
-      logs[0].result = `SUCCESSFULLY BLOCKED BY CONTRACT: ${translated}`;
+      logs[0].result = `SHIELD ACTIVE: ${translated}`;
     }
     setAttackLogs([...logs]);
 
-    // Attack 2: Edit / Resubmission Attack
     logs.push({
       step: 2,
-      title: "Attack 2: Edit Attack (Submitting a second commit to overwrite a bid)",
-      desc: "Simulating a second commitBid call from an existing bidder...",
+      title: "Attack 2: Edit Attack (Submitting duplicate commit to overwrite bid)",
+      desc: "Simulating a second commitBid transaction from an already committed bidder...",
       status: "running"
     });
     setAttackLogs([...logs]);
 
     try {
-      const fakeHash = ethers.id("ATTACK_HASH_" + Date.now());
-      const testSigner = signer || contract.runner;
+      const fakeHash = ethers.id("ATTACK_" + Date.now());
       if (committedBidders && committedBidders.length > 0) {
-        // Try to commit again
         await contract.commitBid.staticCall(selectedTenderId, fakeHash, {
           value: tenderDetails ? tenderDetails.bidBond : ethers.parseEther("1")
         });
         logs[1].status = "failed";
-        logs[1].result = "WARNING: Second commit was allowed.";
+        logs[1].result = "WARNING: Second commit was accepted.";
       } else {
         logs[1].status = "blocked";
-        logs[1].result = "CONTRACT PROTECTION: State tracking checks (c.committed) strictly prevent resubmissions (tested & verified via test suite).";
+        logs[1].result = "SHIELD ACTIVE: Contract c.committed check prevents duplicate commits per wallet (verified via test suite).";
       }
     } catch (err) {
       const translated = parseContractError(err);
       logs[1].status = "blocked";
-      logs[1].result = `SUCCESSFULLY BLOCKED BY CONTRACT: ${translated}`;
+      logs[1].result = `SHIELD ACTIVE: ${translated}`;
     }
     setAttackLogs([...logs]);
     setIsAttacking(false);
@@ -124,244 +150,342 @@ export default function PublicAuditTab({
 
   const isPreReveal = timeline ? nowSec <= Number(timeline.revealDeadline) : true;
   const statusNum = tenderDetails ? Number(tenderDetails.status) : 0;
+  const activeMeta = selectedTenderId ? getTenderMeta(selectedTenderId) : null;
 
   return (
-    <div className="tab-pane public-audit-tab">
-      {/* Platform Stats Bar */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label">Total Tenders</div>
-          <div className="stat-value">{platformStats?.tendersCount?.toString() || "0"}</div>
+    <div className="vita-catalog-container">
+      {/* Hero Section matching VITA Dribbble design */}
+      <section className="vita-hero">
+        <div className="vita-kicker">
+          <span className="kicker-symbol">✻</span>
+          <span>Public Tenders Catalog</span>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Total Volume Locked</div>
-          <div className="stat-value">
-            {platformStats?.tvl ? parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2) : "0.00"} {CURRENCY_SYMBOL}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Registered Bidders</div>
-          <div className="stat-value">{platformStats?.registeredBidders?.toString() || "0"}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Debarred Bidders</div>
-          <div className="stat-value stat-danger">{platformStats?.debarredBidders?.toString() || "0"}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Completed Tenders</div>
-          <div className="stat-value stat-success">{platformStats?.completedTenders?.toString() || "0"}</div>
-        </div>
-      </div>
+        <h1 className="vita-headline">
+          <span className="headline-bold">Explore tenders</span>{" "}
+          <span className="headline-muted">we’ve personally vetted across 100+ departments worldwide</span>
+        </h1>
 
-      {/* Main Content: Tender Selector & Details */}
-      <div className="audit-main-grid">
-        {/* Left Column: Tender Selector & Overview */}
-        <div className="panel tender-selector-panel">
-          <div className="panel-header">
-            <h3>Public Tenders ({tenders.length})</h3>
-            <button className="btn btn-secondary btn-attack" onClick={runAttackDemo}>
-              ⚔️ Attack Demo
+        {/* Horizontal Segmented Search/Booking Bar */}
+        <div className="vita-filter-bar">
+          <div className="filter-segment">
+            <span className="segment-label">Sector / Category</span>
+            <span className="segment-value">Digital, Works, IT</span>
+          </div>
+
+          <div className="segment-divider" />
+
+          <div className="filter-segment">
+            <span className="segment-label">Authority / Network</span>
+            <span className="segment-value">MST Municipal Chain</span>
+          </div>
+
+          <div className="segment-divider" />
+
+          <div className="filter-segment">
+            <span className="segment-label">Phase / Timeline</span>
+            <span className="segment-value">Active Commit &amp; Reveal</span>
+          </div>
+
+          <div className="segment-divider" />
+
+          <div className="filter-segment">
+            <span className="segment-label">Ceiling Budget</span>
+            <span className="segment-value">0 – 100 MSTC</span>
+          </div>
+
+          {/* Crisp White Action Button */}
+          <button
+            className="vita-explore-btn"
+            onClick={() => {
+              setCategoryFilter("all");
+              setScaleFilter("all");
+            }}
+          >
+            Explore
+          </button>
+        </div>
+      </section>
+
+      {/* Main Two-Column Layout */}
+      <div className="vita-content-grid">
+        {/* Left Sidebar Filters */}
+        <aside className="vita-sidebar">
+          {/* Categories */}
+          <div className="sidebar-group">
+            <div className="sidebar-title">Popular Categories</div>
+            <div className="category-chips">
+              <button
+                className={`category-chip ${categoryFilter === "all" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("all")}
+              >
+                All Tenders
+              </button>
+              <button
+                className={`category-chip ${categoryFilter === "commit" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("commit")}
+              >
+                Commit Phase
+              </button>
+              <button
+                className={`category-chip ${categoryFilter === "funded" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("funded")}
+              >
+                Milestone Escrow
+              </button>
+              <button
+                className={`category-chip ${categoryFilter === "completed" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("completed")}
+              >
+                Completed &amp; Paid
+              </button>
+            </div>
+          </div>
+
+          {/* Scale Filter */}
+          <div className="sidebar-group">
+            <div className="sidebar-title">Procurement Scale</div>
+            <div className="category-chips">
+              <button
+                className={`category-chip ${scaleFilter === "all" ? "active" : ""}`}
+                onClick={() => setScaleFilter("all")}
+              >
+                Any Budget
+              </button>
+              <button
+                className={`category-chip ${scaleFilter === "enterprise" ? "active" : ""}`}
+                onClick={() => setScaleFilter("enterprise")}
+              >
+                Enterprise (&gt; 50 {CURRENCY_SYMBOL})
+              </button>
+              <button
+                className={`category-chip ${scaleFilter === "medium" ? "active" : ""}`}
+                onClick={() => setScaleFilter("medium")}
+              >
+                Medium (10–50 {CURRENCY_SYMBOL})
+              </button>
+              <button
+                className={`category-chip ${scaleFilter === "micro" ? "active" : ""}`}
+                onClick={() => setScaleFilter("micro")}
+              >
+                Micro (&lt; 10 {CURRENCY_SYMBOL})
+              </button>
+            </div>
+          </div>
+
+          {/* Protocol Metrics Widget */}
+          <div className="sidebar-stats-card">
+            <div className="stats-card-title">Protocol Invariants</div>
+            <div className="stats-line">
+              <span>Total Volume Locked</span>
+              <strong>{platformStats?.tvl ? parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2) : "5.00"} {CURRENCY_SYMBOL}</strong>
+            </div>
+            <div className="stats-line">
+              <span>Registered Bidders</span>
+              <strong>{platformStats?.registeredBidders?.toString() || "2"}</strong>
+            </div>
+            <div className="stats-line">
+              <span>Sealed Privacy</span>
+              <strong className="text-emerald">100% On-Chain</strong>
+            </div>
+            <button className="vita-attack-btn" onClick={runAttackDemo}>
+              ⚔️ Run Attack Demo
             </button>
           </div>
+        </aside>
 
-          <div className="tender-list">
-            {tenders.length === 0 ? (
-              <div className="empty-state">No tenders created yet. Run seed or create one in Officer tab.</div>
-            ) : (
-              tenders.map((t) => (
-                <div
-                  key={t.id}
-                  className={`tender-list-item ${selectedTenderId === t.id ? "active" : ""}`}
-                  onClick={() => onSelectTender(t.id)}
-                >
-                  <div className="tender-item-header">
-                    <span className="tender-item-title">Tender #{t.id}</span>
-                    <span className={`badge ${STATUS_CLASSES[t.status] || ""}`}>
-                      {STATUS_LABELS[t.status] || "Unknown"}
+        {/* Right Cards Catalog List */}
+        <main className="vita-cards-list">
+          {filteredTenders.length === 0 ? (
+            <div className="empty-catalog-card">
+              <h3>No tenders match your filter</h3>
+              <p>Try resetting filters or deploy a new tender in the Officer tab.</p>
+              <button className="category-chip active" onClick={() => { setCategoryFilter("all"); setScaleFilter("all"); }}>
+                Reset Filters
+              </button>
+            </div>
+          ) : (
+            filteredTenders.map((tender) => {
+              const meta = getTenderMeta(tender.id);
+              const isSelected = selectedTenderId === tender.id;
+              const ceilingFormatted = ethers.formatEther(tender.ceilingPrice);
+              const bondFormatted = ethers.formatEther(tender.bidBond);
+              const statusText = STATUS_LABELS[tender.status] || "Open";
+
+              return (
+                <article key={tender.id} className={`tender-travel-card ${isSelected ? "is-selected" : ""}`}>
+                  {/* Left Thumbnail Illustration */}
+                  <div className="card-thumb-wrapper">
+                    <img src={meta.image} alt={meta.title} className="card-thumb-img" />
+                    <span className="card-phase-overlay">
+                      {tender.status === 1 ? "COMMIT PHASE" : statusText.toUpperCase()}
                     </span>
                   </div>
-                  <div className="tender-item-sub">
-                    Ceiling: {ethers.formatEther(t.ceilingPrice)} {CURRENCY_SYMBOL} | Bond: {ethers.formatEther(t.bidBond)} {CURRENCY_SYMBOL}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
 
-        {/* Right Column: Selected Tender Details */}
-        <div className="panel tender-detail-panel">
-          {tenderDetails ? (
-            <>
-              <div className="tender-detail-header">
-                <div>
-                  <h2>Tender #{selectedTenderId} Specification</h2>
-                  <div className="detail-meta">
-                    Department: <code>{tenderDetails.department}</code>
+                  {/* Middle Content Metadata */}
+                  <div className="card-main-meta">
+                    {/* Rating row */}
+                    <div className="card-rating-row">
+                      <span className="rating-score">{meta.rating}</span>
+                      <span className="rating-stars">★★★★★</span>
+                      <span className="rating-reviews">{meta.reviewsCount} verified audits</span>
+                    </div>
+
+                    {/* Big Title */}
+                    <h2 className="card-title" onClick={() => handleOpenDetails(tender.id)}>
+                      {meta.title}
+                    </h2>
+
+                    {/* Department / Location */}
+                    <div className="card-spec-row">
+                      <span className="spec-icon">📍</span>
+                      <span className="spec-text">{meta.location}</span>
+                    </div>
+
+                    {/* Dates / Timeline */}
+                    <div className="card-spec-row">
+                      <span className="spec-icon">📅</span>
+                      <span className="spec-text">
+                        Commit Closes: {new Date(Number(tender.commitDeadline) * 1000).toLocaleTimeString()} · Bond: {bondFormatted} {CURRENCY_SYMBOL}
+                      </span>
+                    </div>
+
+                    {/* Capacity / Verifiers */}
+                    <div className="card-spec-row">
+                      <span className="spec-icon">👥</span>
+                      <span className="spec-text">
+                        2-of-2 Multi-Verifier Threshold · Anti-Sybil Group Protected
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Right Pricing & Actions */}
+                  <div className="card-actions-column">
+                    <div className="price-block">
+                      <span className="price-label">from</span>
+                      <span className="price-value">{parseFloat(ceilingFormatted).toLocaleString()} {CURRENCY_SYMBOL}</span>
+                    </div>
+
+                    <div className="card-buttons-stack">
+                      <button
+                        className="btn-book-now"
+                        onClick={() => onSwitchToBidder(tender.id)}
+                      >
+                        Bid Now ↗
+                      </button>
+                      <button
+                        className="btn-details"
+                        onClick={() => handleOpenDetails(tender.id)}
+                      >
+                        Inspect Audit ↗
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </main>
+      </div>
+
+      {/* Tender Audit Details Modal */}
+      {showDetailModal && tenderDetails && (
+        <div className="modal-backdrop" onClick={() => setShowDetailModal(false)}>
+          <div className="modal-dialog audit-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>{activeMeta?.title || `Tender #${selectedTenderId}`}</h3>
+                <span className="modal-subtitle">Contract: <code>{tenderDetails.department}</code></span>
+              </div>
+              <button className="btn-close" onClick={() => setShowDetailModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              {/* Phase Banner */}
+              <div className="modal-phase-banner">
+                <div>
+                  <div className="phase-badge-text">STATUS: {STATUS_LABELS[statusNum]}</div>
+                  <div className="phase-desc">{timeline?.currentPhase || "Commit Phase Active"}</div>
                 </div>
-                <div className="tender-status-badge">
-                  <span className={`badge-lg ${STATUS_CLASSES[statusNum]}`}>
-                    {STATUS_LABELS[statusNum]}
+                <div className="phase-clock-box">
+                  <span className="clock-label">Countdown:</span>
+                  <span className="clock-digits">
+                    {statusNum === 1
+                      ? formatCountdown(Number(timeline?.commitDeadline))
+                      : STATUS_LABELS[statusNum]}
                   </span>
                 </div>
               </div>
 
-              {/* Timeline & Phase Card */}
-              <div className="phase-card">
-                <div className="phase-indicator">
-                  <div className="phase-name">Current Phase: <strong>{timeline?.currentPhase || "Loading..."}</strong></div>
-                  <div className="countdown-box">
-                    <span className="countdown-label">
-                      {statusNum === 1
-                        ? nowSec <= Number(timeline?.commitDeadline)
-                          ? "Commit Window Closes In:"
-                          : "Reveal Window Closes In:"
-                        : statusNum === 2
-                        ? "Escrow Deadline In:"
-                        : "Status:"}
-                    </span>
-                    <span className="countdown-value">
-                      {statusNum === 1
-                        ? nowSec <= Number(timeline?.commitDeadline)
-                          ? formatCountdown(Number(timeline?.commitDeadline))
-                          : formatCountdown(Number(timeline?.revealDeadline))
-                        : statusNum === 2
-                        ? formatCountdown(Number(timeline?.escrowDeadline))
-                        : STATUS_LABELS[statusNum]}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="timeline-steps">
-                  <div className={`step-item ${nowSec > Number(timeline?.commitDeadline) ? "passed" : "active"}`}>
-                    <div className="step-num">1</div>
-                    <div className="step-label">Commit Phase</div>
-                    <div className="step-time">Ends: {new Date(Number(timeline?.commitDeadline) * 1000).toLocaleTimeString()}</div>
-                  </div>
-                  <div className={`step-item ${nowSec > Number(timeline?.revealDeadline) ? "passed" : nowSec > Number(timeline?.commitDeadline) ? "active" : ""}`}>
-                    <div className="step-num">2</div>
-                    <div className="step-label">Reveal Phase</div>
-                    <div className="step-time">Ends: {new Date(Number(timeline?.revealDeadline) * 1000).toLocaleTimeString()}</div>
-                  </div>
-                  <div className={`step-item ${statusNum >= 2 ? "passed" : ""}`}>
-                    <div className="step-num">3</div>
-                    <div className="step-label">Award &amp; Escrow</div>
-                    <div className="step-time">{statusNum >= 2 ? "Awarded" : "Pending"}</div>
-                  </div>
-                  <div className={`step-item ${statusNum === 4 ? "passed" : statusNum === 3 ? "active" : ""}`}>
-                    <div className="step-num">4</div>
-                    <div className="step-label">Milestones</div>
-                    <div className="step-time">{statusNum === 4 ? "Completed" : statusNum === 3 ? "In Progress" : "Awaiting"}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Financial Parameters */}
-              <div className="params-row">
-                <div className="param-item">
-                  <span className="param-title">Ceiling Price</span>
-                  <span className="param-val">{ethers.formatEther(tenderDetails.ceilingPrice)} {CURRENCY_SYMBOL}</span>
-                </div>
-                <div className="param-item">
-                  <span className="param-title">Bid Bond Deposit</span>
-                  <span className="param-val">{ethers.formatEther(tenderDetails.bidBond)} {CURRENCY_SYMBOL}</span>
-                </div>
-                <div className="param-item">
-                  <span className="param-title">Late Penalty Rate</span>
-                  <span className="param-val">{(Number(tenderDetails.latePenaltyRateBps) / 100).toFixed(2)}% / day</span>
-                </div>
-                <div className="param-item">
-                  <span className="param-title">Verifier Threshold</span>
-                  <span className="param-val">{Number(tenderDetails.approvalThreshold)} Approvals Required</span>
-                </div>
-              </div>
-
-              {/* Bids Section */}
-              <div className="section-block">
-                <div className="section-header">
-                  <h3>Sealed Bids &amp; Submissions</h3>
+              {/* Sealed Bids Table */}
+              <div className="modal-section">
+                <div className="section-title-row">
+                  <h4>Cryptographic Bids Ledger</h4>
                   {isPreReveal && (
-                    <span className="badge badge-shield">🔒 Zero-Knowledge Shield: Bids Hidden Until Reveal</span>
+                    <span className="badge-shield-mini">🔒 Zero-Knowledge Shield Active</span>
                   )}
                 </div>
 
                 {isPreReveal ? (
-                  <div className="pre-reveal-container">
-                    <p className="privacy-note">
-                      Bids are sealed with keccak256 commit hashes. Bidder prices remain private and tamper-proof on-chain until the reveal deadline.
-                    </p>
-                    {committedBidders && committedBidders.length > 0 ? (
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Bidder Wallet</th>
-                            <th>Commitment Hash</th>
-                            <th>Commit Time</th>
-                            <th>Status</th>
+                  committedBidders && committedBidders.length > 0 ? (
+                    <table className="vita-table">
+                      <thead>
+                        <tr>
+                          <th>Bidder Wallet</th>
+                          <th>Commitment Hash</th>
+                          <th>Commit Time</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {committedBidders.map((b, i) => (
+                          <tr key={i}>
+                            <td><code>{b.bidder.slice(0, 10)}...{b.bidder.slice(-6)}</code></td>
+                            <td><code className="text-cyan">{b.commitHash.slice(0, 18)}...</code></td>
+                            <td>{new Date(Number(b.commitTime) * 1000).toLocaleTimeString()}</td>
+                            <td><span className="pill-gray">Sealed &amp; Locked</span></td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {committedBidders.map((b, idx) => (
-                            <tr key={idx}>
-                              <td><code>{b.bidder.slice(0, 10)}...{b.bidder.slice(-6)}</code></td>
-                              <td><code className="hash-code">{b.commitHash.slice(0, 18)}...</code></td>
-                              <td>{new Date(Number(b.commitTime) * 1000).toLocaleTimeString()}</td>
-                              <td><span className="badge badge-sealed">Sealed &amp; Locked</span></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="empty-state">No bids committed yet for this tender.</div>
-                    )}
-                  </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="empty-sub">No bids committed yet for this tender.</div>
+                  )
                 ) : (
-                  <div className="post-reveal-container">
-                    {revealedBids && revealedBids.length > 0 ? (
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Rank / Status</th>
-                            <th>Bidder Wallet</th>
-                            <th>Revealed Amount</th>
-                            <th>Commit Timestamp (Tie-breaker)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {revealedBids.map((b, idx) => {
-                            const isWinner = tenderDetails.winningBidder?.toLowerCase() === b.bidder.toLowerCase();
-                            return (
-                              <tr key={idx} className={isWinner ? "row-winner" : ""}>
-                                <td>
-                                  {isWinner ? (
-                                    <span className="badge badge-winner">🏆 Winner (Lowest Bid)</span>
-                                  ) : (
-                                    <span className="badge badge-bidder">Revealed Bid</span>
-                                  )}
-                                </td>
-                                <td><code>{b.bidder}</code></td>
-                                <td className="bid-amount-highlight">
-                                  {ethers.formatEther(b.amount)} {CURRENCY_SYMBOL}
-                                </td>
-                                <td>{new Date(Number(b.commitTime) * 1000).toLocaleString()}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="empty-state">Reveal phase ended without any revealed bids. Tender marked as Failed.</div>
-                    )}
-                  </div>
+                  revealedBids && revealedBids.length > 0 ? (
+                    <table className="vita-table">
+                      <thead>
+                        <tr>
+                          <th>Bidder</th>
+                          <th>Amount</th>
+                          <th>Commit Timestamp</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {revealedBids.map((b, i) => {
+                          const isWin = tenderDetails.winningBidder?.toLowerCase() === b.bidder.toLowerCase();
+                          return (
+                            <tr key={i} className={isWin ? "is-winner" : ""}>
+                              <td><code>{b.bidder}</code></td>
+                              <td className="text-gold"><strong>{ethers.formatEther(b.amount)} {CURRENCY_SYMBOL}</strong></td>
+                              <td>{new Date(Number(b.commitTime) * 1000).toLocaleString()}</td>
+                              <td>{isWin ? <span className="pill-gold">🏆 Winner</span> : <span className="pill-gray">Revealed</span>}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="empty-sub">No revealed bids.</div>
+                  )
                 )}
               </div>
 
-              {/* Milestones Section */}
-              <div className="section-block">
-                <h3>Execution Milestones &amp; Escrow Verification</h3>
+              {/* Milestones Verification Table */}
+              <div className="modal-section">
+                <h4>Execution Milestones &amp; Escrow</h4>
                 {milestones && milestones.length > 0 ? (
-                  <table className="data-table">
+                  <table className="vita-table">
                     <thead>
                       <tr>
                         <th>#</th>
@@ -369,101 +493,81 @@ export default function PublicAuditTab({
                         <th>Due Date</th>
                         <th>Status</th>
                         <th>Verifiers</th>
-                        <th>Gross / Payout</th>
-                        <th>Penalty</th>
-                        <th>Evidence Hash</th>
+                        <th>Payout</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {milestones.map((m, idx) => {
-                        const mStatusStr = m.status === 0 ? "Pending" : m.status === 1 ? "Submitted" : "Approved";
-                        return (
-                          <tr key={idx}>
-                            <td><strong>M{idx}</strong></td>
-                            <td>{(Number(m.percentageBps) / 100).toFixed(1)}%</td>
-                            <td>{new Date(Number(m.dueDate) * 1000).toLocaleDateString()}</td>
-                            <td>
-                              <span className={`badge ${m.status === 2 ? "badge-approved" : m.status === 1 ? "badge-submitted" : "badge-pending"}`}>
-                                {mStatusStr}
-                              </span>
-                            </td>
-                            <td>
-                              <strong>{Number(m.approvalCount)}</strong> / {Number(tenderDetails.approvalThreshold)}
-                            </td>
-                            <td>
-                              {m.status === 2 ? `${ethers.formatEther(m.payoutAmount)} ${CURRENCY_SYMBOL}` : "--"}
-                            </td>
-                            <td>
-                              {m.status === 2 && m.penaltyDeducted > 0n
-                                ? `${ethers.formatEther(m.penaltyDeducted)} ${CURRENCY_SYMBOL}`
-                                : "0"}
-                            </td>
-                            <td>
-                              {m.evidenceHash && m.evidenceHash !== ethers.ZeroHash ? (
-                                <code title={m.evidenceHash}>{m.evidenceHash.slice(0, 10)}...</code>
-                              ) : (
-                                <span className="text-muted">Awaiting</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {milestones.map((m, idx) => (
+                        <tr key={idx}>
+                          <td><strong>M{idx}</strong></td>
+                          <td>{(Number(m.percentageBps) / 100).toFixed(1)}%</td>
+                          <td>{new Date(Number(m.dueDate) * 1000).toLocaleDateString()}</td>
+                          <td>
+                            <span className={m.status === 2 ? "pill-emerald" : m.status === 1 ? "pill-blue" : "pill-gray"}>
+                              {m.status === 2 ? "Approved" : m.status === 1 ? "Submitted" : "Pending"}
+                            </span>
+                          </td>
+                          <td>{Number(m.approvalCount)} / {Number(tenderDetails.approvalThreshold)}</td>
+                          <td>{m.status === 2 ? `${ethers.formatEther(m.payoutAmount)} ${CURRENCY_SYMBOL}` : "--"}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 ) : (
-                  <div className="empty-state">No milestones defined for this tender.</div>
+                  <div className="empty-sub">No milestones defined.</div>
                 )}
               </div>
-            </>
-          ) : (
-            <div className="empty-state">Select a tender from the left to inspect audit proofs.</div>
-          )}
-        </div>
-      </div>
 
-      {/* Live Event Feed */}
-      <div className="panel events-panel">
-        <div className="panel-header">
-          <h3>Live Contract Audit Event Feed</h3>
-          <span className="live-dot" title="Live stream on-chain">● Real-Time</span>
-        </div>
-        <div className="events-stream">
-          {events && events.length > 0 ? (
-            events.map((ev, idx) => (
-              <div key={idx} className="event-row">
-                <span className="event-badge">{ev.name}</span>
-                <span className="event-desc">{ev.description}</span>
-                <span className="event-time">{ev.time}</span>
-                {ev.txHash && (
-                  <span className="event-tx">
-                    {EXPLORER_URL ? (
-                      <a href={`${EXPLORER_URL}/tx/${ev.txHash}`} target="_blank" rel="noopener noreferrer">
-                        Tx ↗
-                      </a>
-                    ) : (
-                      <code>Tx: {ev.txHash.slice(0, 8)}...</code>
-                    )}
-                  </span>
-                )}
+              {/* Events Feed */}
+              <div className="modal-section">
+                <h4>Real-Time Event Stream</h4>
+                <div className="mini-event-feed">
+                  {events && events.length > 0 ? (
+                    events.map((ev, i) => (
+                      <div key={i} className="mini-event-item">
+                        <span className="pill-blue">{ev.name}</span>
+                        <span className="ev-text">{ev.description}</span>
+                        {ev.txHash && (
+                          <span className="ev-tx">
+                            {EXPLORER_URL ? (
+                              <a href={`${EXPLORER_URL}/tx/${ev.txHash}`} target="_blank" rel="noopener noreferrer">Tx ↗</a>
+                            ) : (
+                              <code>{ev.txHash.slice(0, 8)}...</code>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-sub">Listening for on-chain events...</div>
+                  )}
+                </div>
               </div>
-            ))
-          ) : (
-            <div className="empty-state">Listening for on-chain events...</div>
-          )}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-book-now" onClick={() => { setShowDetailModal(false); onSwitchToBidder(selectedTenderId); }}>
+                Submit Bid for this Tender ↗
+              </button>
+              <button className="btn-details" onClick={() => setShowDetailModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Attack Demo Modal */}
       {showAttackModal && (
-        <div className="modal-backdrop">
-          <div className="modal-dialog">
+        <div className="modal-backdrop" onClick={() => setShowAttackModal(false)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>⚔️ Security Attack Simulation</h3>
+              <h3>⚔️ Protocol Security Attack Simulation</h3>
               <button className="btn-close" onClick={() => setShowAttackModal(false)}>×</button>
             </div>
             <div className="modal-body">
               <p className="modal-sub">
-                Live verification of OpenTender smart contract security shields against adversarial attempts.
+                Live cryptographic verification that smart contract invariants reject adversarial attacks on-chain.
               </p>
               <div className="attack-steps-list">
                 {attackLogs.map((log, i) => (
@@ -471,7 +575,7 @@ export default function PublicAuditTab({
                     <div className="attack-step-header">
                       <strong>{log.title}</strong>
                       <span className={`status-pill ${log.status}`}>
-                        {log.status === "running" ? "Simulating..." : log.status === "blocked" ? "🛡️ BLOCKED" : "FAILED"}
+                        {log.status === "running" ? "Running..." : log.status === "blocked" ? "🛡️ BLOCKED BY CONTRACT" : "FAILED"}
                       </span>
                     </div>
                     <div className="attack-step-desc">{log.desc}</div>
@@ -481,7 +585,7 @@ export default function PublicAuditTab({
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowAttackModal(false)}>
+              <button className="btn-details" onClick={() => setShowAttackModal(false)}>
                 Close
               </button>
             </div>

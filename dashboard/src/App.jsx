@@ -30,6 +30,8 @@ export default function App() {
     isDebarred: false,
   });
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -56,6 +58,11 @@ export default function App() {
     } catch {
       // Fallback
     }
+  }
+
+  function handleSwitchToBidder(tenderId) {
+    if (tenderId) setSelectedTenderId(Number(tenderId));
+    handleTabChange("bidder");
   }
   const [tenders, setTenders] = useState([]);
   const [selectedTenderId, setSelectedTenderId] = useState(() => {
@@ -322,56 +329,41 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      <Header
-        account={account}
-        chainId={chainId}
-        roles={roles}
-        balance={balance}
-        onConnect={connectWallet}
-        onSwitchNetwork={switchNetwork}
-      />
+      <div className="vita-container">
+        <Header
+          account={account}
+          chainId={chainId}
+          roles={roles}
+          balance={balance}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onConnect={connectWallet}
+          onSwitchNetwork={switchNetwork}
+        />
 
-      {/* Tabs Bar */}
-      <nav className="tab-navigation">
-        <button
-          className={`tab-btn ${activeTab === "audit" ? "active" : ""}`}
-          onClick={() => handleTabChange("audit")}
-        >
-          🔍 Public Audit &amp; Tenders
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "bidder" ? "active" : ""}`}
-          onClick={() => handleTabChange("bidder")}
-        >
-          💼 Bidder &amp; Contractor Portal
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "officer" ? "active" : ""}`}
-          onClick={() => handleTabChange("officer")}
-        >
-          🏛️ Officer &amp; Verifiers
-        </button>
-      </nav>
-
-      {/* Main Tab Panels */}
-      <main className="main-content">
-        {activeTab === "audit" && (
-          <PublicAuditTab
-            contract={getReadOnlyContract()}
-            tenders={tenders}
-            selectedTenderId={selectedTenderId}
-            onSelectTender={setSelectedTenderId}
-            tenderDetails={selectedTenderDetails}
-            milestones={milestones}
-            timeline={timeline}
-            revealedBids={revealedBids}
-            committedBidders={committedBidders}
-            platformStats={platformStats}
-            events={events}
-            account={account}
-            signer={signer}
-          />
-        )}
+        {/* Main Tab Panels */}
+        <main className="main-content">
+          {activeTab === "audit" && (
+            <PublicAuditTab
+              contract={getReadOnlyContract()}
+              tenders={tenders}
+              selectedTenderId={selectedTenderId}
+              onSelectTender={setSelectedTenderId}
+              tenderDetails={selectedTenderDetails}
+              milestones={milestones}
+              timeline={timeline}
+              revealedBids={revealedBids}
+              committedBidders={committedBidders}
+              platformStats={platformStats}
+              events={events}
+              account={account}
+              signer={signer}
+              onSwitchToBidder={handleSwitchToBidder}
+              searchQuery={searchQuery}
+            />
+          )}
 
         {activeTab === "bidder" && (
           <BidderTab
@@ -406,11 +398,12 @@ export default function App() {
         )}
       </main>
 
-      {/* Notification Toast */}
-      <TxNotification
-        notification={notification}
-        onDismiss={() => setNotification({ active: false, title: "", hash: "", error: "", success: "" })}
-      />
+        {/* Notification Toast */}
+        <TxNotification
+          notification={notification}
+          onDismiss={() => setNotification({ active: false, title: "", hash: "", error: "", success: "" })}
+        />
+      </div>
     </div>
   );
 }

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" width="100%" height="100%">
+  <defs>
+    <linearGradient id="cbg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c1817"/>
+      <stop offset="50%" stop-color="#142c28"/>
+      <stop offset="100%" stop-color="#071312"/>
+    </linearGradient>
+    <linearGradient id="cloudglow" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="250" fill="url(#cbg)"/>
+  <!-- Cyber nodes & constellations -->
+  <circle cx="80" cy="70" r="3" fill="#38bdf8"/>
+  <circle cx="160" cy="50" r="4" fill="#22d3ee"/>
+  <circle cx="240" cy="80" r="3" fill="#38bdf8"/>
+  <circle cx="320" cy="40" r="3.5" fill="#22d3ee"/>
+  <line x1="80" y1="70" x2="160" y2="50" stroke="#38bdf8" stroke-width="0.8" opacity="0.6"/>
+  <line x1="160" y1="50" x2="240" y2="80" stroke="#38bdf8" stroke-width="0.8" opacity="0.6"/>
+  <line x1="240" y1="80" x2="320" y2="40" stroke="#38bdf8" stroke-width="0.8" opacity="0.6"/>
+  <!-- Modern structural architecture silhouette -->
+  <polygon points="60,250 60,140 130,120 130,250" fill="#0f2926"/>
+  <polygon points="140,250 140,90 220,110 220,250" fill="#133632"/>
+  <polygon points="230,250 230,130 310,140 310,250" fill="#0f2926"/>
+  <polygon points="320,250 320,160 380,170 380,250" fill="#0b201d"/>
+  <!-- Glowing window accents -->
+  <rect x="75" y="150" width="8" height="15" fill="#2dd4bf" opacity="0.7"/>
+  <rect x="95" y="150" width="8" height="15" fill="#2dd4bf" opacity="0.5"/>
+  <rect x="160" y="110" width="10" height="20" fill="#38bdf8" opacity="0.8"/>
+  <rect x="185" y="110" width="10" height="20" fill="#38bdf8" opacity="0.6"/>
+  <rect x="160" y="145" width="10" height="20" fill="#38bdf8" opacity="0.7"/>
+  <rect x="185" y="145" width="10" height="20" fill="#38bdf8" opacity="0.5"/>
+  <rect x="250" y="155" width="8" height="15" fill="#2dd4bf" opacity="0.7"/>
+  <rect x="275" y="155" width="8" height="15" fill="#2dd4bf" opacity="0.5"/>
+  <!-- Horizon mist -->
+  <rect x="0" y="180" width="400" height="70" fill="url(#cloudglow)"/>
+</svg>
