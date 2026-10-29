@@ -40,6 +40,13 @@ export default function App() {
     }
   });
   const [activeWalletProvider, setActiveWalletProvider] = useState(() => (typeof window !== "undefined" ? window.ethereum || null : null));
+  const [activeWalletName, setActiveWalletName] = useState(() => {
+    try {
+      return localStorage.getItem("opentender_wallet_name") || "";
+    } catch {
+      return "";
+    }
+  });
   const [searchQuery, setSearchQuery] = useState("");
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -275,7 +282,7 @@ export default function App() {
     setShowWalletModal(true);
   }
 
-  async function connectWalletWithProvider(chosenProvider) {
+  async function connectWalletWithProvider(chosenProvider, walletName = "") {
     const rawProvider = chosenProvider || activeWalletProvider || window.ethereum;
     if (!rawProvider) {
       setNotification({
@@ -295,6 +302,10 @@ export default function App() {
       const network = await browserProvider.getNetwork();
 
       setActiveWalletProvider(rawProvider);
+      if (walletName) {
+        setActiveWalletName(walletName);
+        try { localStorage.setItem("opentender_wallet_name", walletName); } catch {}
+      }
       setAccount(addr);
       setSigner(s);
       setChainId(Number(network.chainId));
@@ -316,6 +327,24 @@ export default function App() {
     } catch (err) {
       setNotification({ active: true, title: "Connection Failed", error: parseContractError(err) });
     }
+  }
+
+  function disconnectWallet() {
+    setAccount(null);
+    setSigner(null);
+    setActiveWalletProvider(null);
+    setActiveWalletName("");
+    setBalance("0");
+    setRoles({
+      isRegistrar: false,
+      isDepartment: false,
+      isVerifier: false,
+      isBidder: false,
+      isDebarred: false,
+    });
+    try {
+      localStorage.removeItem("opentender_wallet_name");
+    } catch {}
   }
 
   // Add / Switch Network
@@ -397,7 +426,9 @@ export default function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onConnect={handleOpenConnect}
+          onDisconnect={disconnectWallet}
           onSwitchNetwork={switchNetwork}
+          activeWalletName={activeWalletName}
         />
 
         {/* Main Tab Panels */}
