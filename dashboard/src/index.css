@@ -66,7 +66,7 @@ code, pre {
     radial-gradient(1200px circle at 50% -5%, rgba(22, 65, 60, 0.45) 0%, rgba(9, 21, 20, 0.92) 50%, #060e0d 100%),
     radial-gradient(800px circle at 85% 60%, rgba(16, 185, 129, 0.06) 0%, transparent 60%),
     radial-gradient(800px circle at 15% 70%, rgba(6, 182, 212, 0.05) 0%, transparent 60%);
-  padding: 1.75rem 1.25rem 2.5rem 1.25rem;
+  padding: 1.5rem 1.25rem 2rem 1.25rem;
   display: flex;
   justify-content: center;
 }
@@ -80,7 +80,7 @@ code, pre {
   background: var(--bg-container);
   border: 1px solid var(--border-subtle);
   border-radius: 26px;
-  padding: 1.75rem 2rem 2.5rem 2rem;
+  padding: 1.5rem 1.75rem 1.75rem 1.75rem;
   box-shadow: 
     0 30px 80px rgba(0, 0, 0, 0.8),
     0 0 1px 1px rgba(255, 255, 255, 0.05) inset;
@@ -95,8 +95,8 @@ code, pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2.25rem;
-  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
   flex-wrap: wrap;
 }
 
@@ -106,6 +106,7 @@ code, pre {
   gap: 0.5rem;
   cursor: pointer;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .brand-symbol {
@@ -133,7 +134,9 @@ code, pre {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  width: 260px;
+  flex: 0 1 310px;
+  min-width: 200px;
+  box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
@@ -146,6 +149,7 @@ code, pre {
 .vita-search-pill .search-icon {
   font-size: 0.85rem;
   opacity: 0.6;
+  flex-shrink: 0;
 }
 
 .vita-search-pill input {
@@ -155,6 +159,7 @@ code, pre {
   color: #ffffff;
   font-size: 0.82rem;
   width: 100%;
+  min-width: 0;
 }
 
 .vita-search-pill input::placeholder {
@@ -165,7 +170,8 @@ code, pre {
 .vita-nav {
   display: flex;
   align-items: center;
-  gap: 1.75rem;
+  gap: 1.5rem;
+  flex-shrink: 0;
 }
 
 .vita-nav .nav-link {
@@ -312,7 +318,7 @@ code, pre {
    VITA Hero Section
    ========================================================================== */
 .vita-hero {
-  margin-bottom: 2.25rem;
+  margin-bottom: 1.5rem;
 }
 
 .vita-kicker {
@@ -322,7 +328,7 @@ code, pre {
   color: var(--text-muted);
   font-size: 0.82rem;
   font-weight: 500;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.5rem;
 }
 
 .kicker-symbol {
@@ -333,7 +339,7 @@ code, pre {
 .vita-headline {
   font-size: 2.5rem;
   line-height: 1.18;
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
   letter-spacing: -0.03em;
 }
 
@@ -352,7 +358,7 @@ code, pre {
   color: var(--text-muted);
   max-width: 820px;
   line-height: 1.5;
-  margin-bottom: 1.85rem;
+  margin-bottom: 1.25rem;
 }
 
 /* ==========================================================================
@@ -431,7 +437,7 @@ code, pre {
    ========================================================================== */
 .vita-content-grid {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: 230px minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
   min-width: 0;
@@ -443,17 +449,18 @@ code, pre {
 .vita-sidebar {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .sidebar-group {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .sidebar-title {
   font-size: 0.85rem;
   font-weight: 600;
   color: #ffffff;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.75rem;
   letter-spacing: -0.01em;
 }
 
@@ -493,8 +500,9 @@ code, pre {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  padding: 1.25rem;
-  margin-top: 1rem;
+  padding: 1.15rem 1rem;
+  margin-top: 0.85rem;
+  box-sizing: border-box;
 }
 
 .stats-card-title {
@@ -507,17 +515,36 @@ code, pre {
 }
 
 .stats-line {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.85rem;
   font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.65rem;
+  min-width: 0;
 }
 
-.stats-line strong {
+.stats-line:last-of-type {
+  margin-bottom: 0.35rem;
+}
+
+.stats-line span,
+.stats-metric-label {
+  color: var(--text-muted);
+  line-height: 1.35;
+  text-align: left;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.stats-line strong,
+.stats-metric-value {
   color: #ffffff;
   font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
 }
 
 .text-emerald {
@@ -526,15 +553,23 @@ code, pre {
 
 .vita-attack-btn {
   width: 100%;
-  margin-top: 1rem;
+  box-sizing: border-box;
+  margin-top: 0.85rem;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.35);
   color: #fca5a5;
   font-size: 0.78rem;
+  line-height: 1.35;
   font-weight: 600;
-  padding: 0.65rem;
+  padding: 0.65rem 0.6rem;
   border-radius: 10px;
   cursor: pointer;
+  text-align: center;
+  white-space: normal;
+  word-break: normal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s ease;
 }
 
@@ -2020,10 +2055,10 @@ input[type="file"]::file-selector-button:hover {
    ========================================================================== */
 @media (max-width: 1240px) {
   .vita-container {
-    padding: 1.5rem 1.5rem 2.25rem 1.5rem;
+    padding: 1.35rem 1.35rem 1.5rem 1.35rem;
   }
   .vita-content-grid {
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
     gap: 1.25rem;
   }
   .card-thumb-wrapper {
@@ -2037,10 +2072,40 @@ input[type="file"]::file-selector-button:hover {
     font-size: 1.25rem;
   }
   .vita-search-pill {
-    width: 210px;
+    flex: 0 1 200px;
+    min-width: 150px;
   }
   .vita-nav {
-    gap: 1.25rem;
+    gap: 1.15rem;
+  }
+}
+
+@media (max-width: 1080px) {
+  .vita-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    margin-bottom: 1.35rem;
+  }
+  .vita-brand {
+    order: 1;
+  }
+  .vita-nav {
+    order: 2;
+    gap: 1.15rem;
+  }
+  .vita-actions {
+    order: 3;
+    gap: 0.5rem;
+  }
+  .vita-search-pill {
+    order: 4;
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 100%;
+    margin-top: 0.35rem;
   }
 }
 
@@ -2073,15 +2138,26 @@ input[type="file"]::file-selector-button:hover {
 
 @media (max-width: 820px) {
   .vita-header {
-    flex-wrap: wrap;
     gap: 0.75rem;
   }
-  .vita-search-pill {
-    width: 100%;
-    order: 10;
+  .vita-brand {
+    order: 1;
+  }
+  .vita-actions {
+    order: 2;
   }
   .vita-nav {
-    order: 5;
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    gap: 1rem;
+  }
+  .vita-search-pill {
+    order: 4;
+    width: 100%;
+    margin-top: 0.25rem;
   }
   .vita-filter-bar {
     flex-direction: column;

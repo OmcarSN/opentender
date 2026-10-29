@@ -347,16 +347,20 @@ export default function PublicAuditTab({
           <div className="sidebar-stats-card">
             <div className="stats-card-title">Protocol Metrics</div>
             <div className="stats-line">
-              <span>Total Volume Locked</span>
-              <strong>{platformStats?.tvl ? parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2) : "5.00"} {CURRENCY_SYMBOL}</strong>
+              <span className="stats-metric-label">Total Volume Locked</span>
+              <strong className="stats-metric-value">
+                {platformStats?.tvl ? parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2) : "5.00"} {CURRENCY_SYMBOL}
+              </strong>
             </div>
             <div className="stats-line">
-              <span>Registered Bidders</span>
-              <strong>{platformStats?.registeredBidders?.toString() || "2"}</strong>
+              <span className="stats-metric-label">Registered Bidders</span>
+              <strong className="stats-metric-value">
+                {platformStats?.registeredBidders?.toString() || "2"}
+              </strong>
             </div>
             <div className="stats-line">
-              <span>Sealed Privacy</span>
-              <strong className="text-emerald">Enforced On-Chain</strong>
+              <span className="stats-metric-label">Sealed Privacy</span>
+              <strong className="stats-metric-value text-emerald">Enforced On-Chain</strong>
             </div>
             <button className="vita-attack-btn" onClick={runAttackDemo}>
               Run Security Verification
