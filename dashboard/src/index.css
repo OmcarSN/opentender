@@ -54,6 +54,11 @@ code, pre {
   font-family: var(--font-mono);
 }
 
+header, nav, nav a, button, .tab, .pill {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* ==========================================================================
    Outer Canvas with Ambient Aurora Glow
    ========================================================================== */
