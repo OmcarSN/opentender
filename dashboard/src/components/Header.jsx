@@ -49,19 +49,27 @@ export default function Header({
         {/* a) Logo text "OpenTender" */}
         <div
           className="vita-brand"
-          onClick={() => onTabChange("audit")}
+          onClick={() => onTabChange("home")}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") onTabChange("audit");
+            if (e.key === "Enter" || e.key === " ") onTabChange("home");
           }}
           aria-label="OpenTender Home"
         >
           <span className="brand-name">OpenTender</span>
         </div>
 
-        {/* b) Navigation with exactly three items: "Tenders", "Bid", "Department & Verifiers" */}
+        {/* b) Navigation items: "How it works", "Tenders", "Bid", "Department & Verifiers" */}
         <nav className="vita-nav" role="tablist" aria-label="Main Navigation">
+          <button
+            role="tab"
+            aria-selected={activeTab === "home"}
+            className={`nav-link ${activeTab === "home" ? "active" : ""}`}
+            onClick={() => onTabChange("home")}
+          >
+            How it works
+          </button>
           <button
             role="tab"
             aria-selected={activeTab === "audit"}

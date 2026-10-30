@@ -12,6 +12,7 @@ import {
 } from "./config";
 import Header from "./components/Header";
 import WalletModal from "./components/WalletModal";
+import HomeTab from "./components/HomeTab";
 import PublicAuditTab from "./components/PublicAuditTab";
 import BidderTab from "./components/BidderTab";
 import OfficerTab from "./components/OfficerTab";
@@ -53,24 +54,29 @@ export default function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam === "bidder" || tabParam === "officer" || tabParam === "audit") {
+      if (tabParam === "home" || tabParam === "bidder" || tabParam === "officer" || tabParam === "audit") {
         return tabParam;
       }
       const hash = window.location.hash.replace("#", "");
-      if (hash === "bidder" || hash === "officer" || hash === "audit") {
+      if (hash === "home" || hash === "bidder" || hash === "officer" || hash === "audit") {
         return hash;
       }
     } catch {
       // Fallback
     }
-    return "audit";
+    return "home";
   });
 
-  function handleTabChange(tab) {
+  function handleTabChange(tab, openCheat = false) {
     setActiveTab(tab);
     try {
       const url = new URL(window.location.href);
       url.searchParams.set("tab", tab);
+      if (openCheat && tab === "audit") {
+        url.searchParams.set("cheat", "true");
+      } else {
+        url.searchParams.delete("cheat");
+      }
       window.history.replaceState({}, "", url);
     } catch {
       // Fallback
@@ -449,6 +455,12 @@ export default function App() {
 
         {/* Main Tab Panels */}
         <main className="main-content">
+          {activeTab === "home" && (
+            <HomeTab
+              onNavigate={(tab, openCheat) => handleTabChange(tab, openCheat)}
+            />
+          )}
+
           {activeTab === "audit" && (
             <PublicAuditTab
               contract={getReadOnlyContract()}

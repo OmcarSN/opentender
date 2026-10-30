@@ -4285,3 +4285,172 @@ details[open] .details-chevron {
   color: #cbd5e1;
   line-height: 1.4;
 }
+
+/* =========================================================================
+   Home Tab ("How it works") Styles
+   ========================================================================= */
+.home-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-bottom: 2.5rem;
+}
+
+.home-hero {
+  text-align: center;
+  padding: 3rem 1.75rem 2rem;
+  background: radial-gradient(circle at 50% 25%, rgba(16, 185, 129, 0.08) 0%, rgba(0, 0, 0, 0.25) 75%);
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+}
+
+.home-headline {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.home-subline {
+  font-size: clamp(1rem, 1.8vw, 1.15rem);
+  color: #94a3b8;
+  max-width: 760px;
+  margin: 0 auto 1.85rem;
+  line-height: 1.6;
+}
+
+.home-actions-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn-cta {
+  padding: 0.75rem 1.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+}
+
+.home-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.25rem;
+}
+
+.home-step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 1.35rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.home-step-card:hover {
+  border-color: rgba(16, 185, 129, 0.35);
+  transform: translateY(-2px);
+}
+
+.step-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--emerald-light);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.step-card-text {
+  font-size: 0.92rem;
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.step-card-text strong {
+  color: #ffffff;
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.98rem;
+}
+
+.home-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.home-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 1.75rem;
+}
+
+.home-section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 1.15rem 0;
+}
+
+.problem-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.problem-bullets li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+  color: #f1f5f9;
+  line-height: 1.45;
+}
+
+.bullet-icon {
+  color: #f87171;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.limitation-card {
+  border-left: 4px solid #f59e0b;
+}
+
+.limitation-box-body p {
+  font-size: 0.92rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.home-bottom-cta {
+  padding-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .home-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
