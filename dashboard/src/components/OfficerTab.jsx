@@ -1,38 +1,23 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { ethers } from "ethers";
-import { CURRENCY_SYMBOL, CHAIN_ID, DEMO_VERIFIERS, getReadOnlyContract } from "../config";
+import { CURRENCY_SYMBOL, CHAIN_ID, CHAIN_NAME, DEMO_VERIFIERS, getReadOnlyContract } from "../config";
 import { parseContractError } from "../utils/errors";
 
-const STATUS_NAMES = [
-  "Draft / None",
-  "Open (Commit / Reveal)",
-  "Awarded (Pending Escrow)",
-  "Funded (Milestone Execution)",
-  "Completed",
-  "Defaulted",
-  "Cancelled",
-  "Failed"
-];
+function formatCountdown(targetTime, now) {
+  if (!targetTime) return "None";
+  const diff = Number(targetTime) - Number(now);
+  if (diff <= 0) return "Ended";
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  return `${h > 0 ? `${h}h ` : ""}${m}m ${s < 10 ? `0${s}` : s}s`;
+}
 
-function getStatusBadgeClass(status) {
-  switch (status) {
-    case 1:
-      return "badge-commit";
-    case 2:
-      return "badge-awarded";
-    case 3:
-      return "badge-funded";
-    case 4:
-      return "badge-completed";
-    case 5:
-      return "badge-defaulted";
-    case 6:
-      return "badge-cancelled";
-    case 7:
-      return "badge-failed";
-    default:
-      return "badge-secondary";
-  }
+function formatMinutesSeconds(seconds) {
+  if (seconds <= 0) return "00:00";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 export default function OfficerTab({
@@ -47,35 +32,40 @@ export default function OfficerTab({
   isDataLoading = false,
   dataLoadError = null,
   chainId = null,
-  latestBlockTimestamp = 0
+  latestBlockTimestamp = 0,
 }) {
   const isWrongNetwork = chainId !== null && chainId !== CHAIN_ID;
-  const currentBlockTime = latestBlockTimestamp > 0 ? latestBlockTimestamp : Math.floor(Date.now() / 1000);
+  const currentBlockTime =
+    latestBlockTimestamp > 0 ? latestBlockTimestamp : Math.floor(Date.now() / 1000);
 
   // Submitting tracker
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingTenderId, setSubmittingTenderId] = useState(null);
 
-  // Department: Create Tender Form State
+  // ==========================================================================
+  // STEP 1: Department: Publish Tender Form State
+  // ==========================================================================
+  const [projectTitle, setProjectTitle] = useState("Demo road repair");
   const [ceilingPrice, setCeilingPrice] = useState("0.02");
   const [bidBond, setBidBond] = useState("0.002");
   const [commitMins, setCommitMins] = useState("3");
   const [revealMins, setRevealMins] = useState("3");
-  const [escrowHours, setEscrowHours] = useState("1");
-  const [graceHours, setGraceHours] = useState("1");
-  const [penaltyBps, setPenaltyBps] = useState("200");
-  const [docHash, setDocHash] = useState("MST_BUILDATHON_PROCUREMENT_V1");
+
+  // ==========================================================================
+  // STEP 2: Collapsed Advanced Section Defaults
+  // ==========================================================================
+  const [penaltyPercent, setPenaltyPercent] = useState("2"); // percent (default 2, sent as 200 bps)
+  const [escrowHours, setEscrowHours] = useState("1"); // hours (default 1)
+  const [graceHours, setGraceHours] = useState("1"); // hours (default 1)
   const [verifiersText, setVerifiersText] = useState(DEMO_VERIFIERS);
-  const [threshold, setThreshold] = useState("2");
+  const [threshold, setThreshold] = useState("2"); // default 2
 
-  // Lifecycle control state
-  const [actionTenderId, setActionTenderId] = useState(() => {
-    if (selectedTenderId) return Number(selectedTenderId);
-    if (tenders.length > 0) return Number(tenders[0].id);
-    return "";
-  });
-  const [cancelReason, setCancelReason] = useState("Budget re-allocation");
+  // Authorization flags
+  const isDeptRole = Boolean(roles?.isDepartment);
+  const isVerifierRole = Boolean(roles?.isVerifier);
+  const isRegistrarRole = Boolean(roles?.isRegistrar);
 
-  // Verifier state
+  // Verifier state (Milestone Verification panel)
   const fundedTenders = useMemo(() => tenders.filter((t) => t.status === 3), [tenders]);
   const [verifyTenderId, setVerifyTenderId] = useState(() => {
     if (fundedTenders.length > 0) return Number(fundedTenders[0].id);
@@ -92,27 +82,10 @@ export default function OfficerTab({
   const [debarAddress, setDebarAddress] = useState("");
   const [debarReason, setDebarReason] = useState("Violation of procurement compliance");
 
-  // Selected Action Tender resolution
-  const selectedActionTender = useMemo(() => {
-    if (!actionTenderId) return null;
-    return tenders.find((t) => Number(t.id) === Number(actionTenderId)) || null;
-  }, [actionTenderId, tenders]);
-
-  // Selected Verify Tender resolution
   const selectedVerifyTender = useMemo(() => {
     if (!verifyTenderId) return null;
     return tenders.find((t) => Number(t.id) === Number(verifyTenderId)) || null;
   }, [verifyTenderId, tenders]);
-
-  // Auto pre-select latest relevant tender so dropdowns are never blank
-  useEffect(() => {
-    if (tenders.length > 0) {
-      const exists = tenders.some((t) => Number(t.id) === Number(actionTenderId));
-      if (!actionTenderId || !exists) {
-        setActionTenderId(Number(tenders[tenders.length - 1].id));
-      }
-    }
-  }, [tenders, actionTenderId]);
 
   useEffect(() => {
     if (fundedTenders.length > 0) {
@@ -123,24 +96,31 @@ export default function OfficerTab({
     }
   }, [fundedTenders, verifyTenderId]);
 
-  // Authorization flags
-  const isDeptRole = Boolean(roles?.isDepartment);
-  const isVerifierRole = Boolean(roles?.isVerifier);
-  const isRegistrarRole = Boolean(roles?.isRegistrar);
-  const isTenderDepartment = Boolean(
-    account &&
-      selectedActionTender?.department &&
-      account.toLowerCase() === selectedActionTender.department.toLowerCase()
-  );
+  // ==========================================================================
+  // STEP 1: "Fill demo values" Handler
+  // ==========================================================================
+  function handleFillDemoValues() {
+    setProjectTitle("Demo road repair");
+    setCeilingPrice("0.02");
+    setBidBond("0.002");
+    setCommitMins("3");
+    setRevealMins("3");
+    setPenaltyPercent("2");
+    setEscrowHours("1");
+    setGraceHours("1");
+    setVerifiersText(DEMO_VERIFIERS);
+    setThreshold("2");
+  }
 
   // ==========================================================================
-  // Form Validations: Create Tender
+  // STEP 3: Validation Before Sending
   // ==========================================================================
-  const parsedCeiling = parseFloat(ceilingPrice);
-  const isCeilingValid = !isNaN(parsedCeiling) && parsedCeiling > 0;
+  const parsedPrice = parseFloat(ceilingPrice);
+  const isPricePositive = !isNaN(parsedPrice) && parsedPrice > 0;
 
-  const parsedBidBond = parseFloat(bidBond);
-  const isBidBondValid = !isNaN(parsedBidBond) && parsedBidBond > 0;
+  const parsedDeposit = parseFloat(bidBond);
+  const isDepositPositive = !isNaN(parsedDeposit) && parsedDeposit > 0;
+  const isDepositLessThanPrice = isPricePositive && isDepositPositive && parsedDeposit < parsedPrice;
 
   const parsedCommitMins = parseInt(commitMins, 10);
   const isCommitMinsValid = !isNaN(parsedCommitMins) && parsedCommitMins >= 1;
@@ -154,10 +134,10 @@ export default function OfficerTab({
   const parsedGraceHours = parseInt(graceHours, 10);
   const isGraceHoursValid = !isNaN(parsedGraceHours) && parsedGraceHours >= 1;
 
-  const parsedPenaltyBps = parseInt(penaltyBps, 10);
-  const isPenaltyBpsValid = !isNaN(parsedPenaltyBps) && parsedPenaltyBps >= 0 && parsedPenaltyBps <= 1000;
+  const parsedPenalty = parseFloat(penaltyPercent);
+  const isPenaltyValid = !isNaN(parsedPenalty) && parsedPenalty >= 0 && parsedPenalty <= 10;
 
-  const isDocHashValid = docHash.trim().length > 0;
+  const isTitleValid = projectTitle.trim().length > 0;
 
   // Verifier addresses validation
   const { verifierAddresses, invalidVerifierTokens, hasDuplicateVerifiers } = useMemo(() => {
@@ -188,7 +168,7 @@ export default function OfficerTab({
     return {
       verifierAddresses: validAddrs,
       invalidVerifierTokens: invalidTokens,
-      hasDuplicateVerifiers: duplicateFound
+      hasDuplicateVerifiers: duplicateFound,
     };
   }, [verifiersText]);
 
@@ -203,21 +183,578 @@ export default function OfficerTab({
     parsedThreshold >= 1 &&
     parsedThreshold <= verifierAddresses.length;
 
-  const isCreateTenderValid =
-    isCeilingValid &&
-    isBidBondValid &&
+  const isFormValid =
+    isTitleValid &&
+    isPricePositive &&
+    isDepositPositive &&
+    isDepositLessThanPrice &&
     isCommitMinsValid &&
     isRevealMinsValid &&
     isEscrowHoursValid &&
     isGraceHoursValid &&
-    isPenaltyBpsValid &&
-    isDocHashValid &&
+    isPenaltyValid &&
     isVerifiersValid &&
     isThresholdValid;
 
+  const canPublishTender =
+    account &&
+    isDeptRole &&
+    !isWrongNetwork &&
+    isFormValid &&
+    !isSubmitting;
+
+  // Compute disabled reason for publish button
+  let publishDisabledReason = null;
+  if (!account || !isDeptRole) {
+    publishDisabledReason = "Connect a department wallet to use this section.";
+  } else if (isWrongNetwork) {
+    publishDisabledReason = `Wrong Network — Switch to ${CHAIN_NAME}`;
+  } else if (!isTitleValid) {
+    publishDisabledReason = "Enter a project title.";
+  } else if (!isPricePositive) {
+    publishDisabledReason = "Maximum price must be greater than 0.";
+  } else if (!isDepositPositive) {
+    publishDisabledReason = "Deposit must be greater than 0.";
+  } else if (!isDepositLessThanPrice) {
+    publishDisabledReason = "Deposit must be strictly less than maximum price.";
+  } else if (!isCommitMinsValid || !isRevealMinsValid) {
+    publishDisabledReason = "Bidding and opening durations must be at least 1 minute.";
+  } else if (!isVerifiersValid) {
+    publishDisabledReason = "Enter valid, non-duplicate verifier addresses.";
+  } else if (!isThresholdValid) {
+    publishDisabledReason = `Approvals needed must be between 1 and ${verifierAddresses.length}.`;
+  } else if (isSubmitting) {
+    publishDisabledReason = "Publishing tender...";
+  }
+
   // ==========================================================================
-  // Form Validations: Registrar
+  // Publish Tender Handler (Step 1 & Step 3)
   // ==========================================================================
+  async function handlePublishTender(e) {
+    e.preventDefault();
+    if (!canPublishTender || !signerContract) return;
+
+    try {
+      setIsSubmitting(true);
+      setNotification({ active: true, title: "Publishing tender on-chain..." });
+
+      // Deadlines computed from latest BLOCK timestamp + 60s margin
+      const blockNow = latestBlockTimestamp > 0 ? Number(latestBlockTimestamp) : Math.floor(Date.now() / 1000);
+      const now = blockNow + 60;
+      const commitDeadline = now + parsedCommitMins * 60;
+      const revealDeadline = commitDeadline + parsedRevealMins * 60;
+      const escrowWindow = parsedEscrowHours * 3600;
+      const gracePeriod = parsedGraceHours * 3600;
+      const penaltyBps = Math.round(parsedPenalty * 100);
+
+      // 3 milestones: 30%, 30%, 40%
+      const milestones = [
+        { percentageBps: 3000, dueDate: revealDeadline + 20 * 60 },
+        { percentageBps: 3000, dueDate: revealDeadline + 40 * 60 },
+        { percentageBps: 4000, dueDate: revealDeadline + 60 * 60 },
+      ];
+
+      // Document hash: keccak256 of UTF-8 title text
+      const titleText = projectTitle.trim();
+      const documentHash = ethers.keccak256(ethers.toUtf8Bytes(titleText));
+
+      const tx = await signerContract.createTender(
+        ethers.parseEther(ceilingPrice),
+        ethers.parseEther(bidBond),
+        commitDeadline,
+        revealDeadline,
+        escrowWindow,
+        gracePeriod,
+        penaltyBps,
+        documentHash,
+        milestones,
+        verifierAddresses,
+        parsedThreshold
+      );
+
+      setNotification({ active: true, title: "Mining tender creation on-chain...", hash: tx.hash });
+      const receipt = await tx.wait();
+
+      // Find created tender ID from receipt logs or fallback
+      let createdTenderId = null;
+      if (receipt && receipt.logs) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = signerContract.interface.parseLog(log);
+            if (parsed && parsed.name === "TenderCreated") {
+              createdTenderId = Number(parsed.args.tenderId);
+              break;
+            }
+          } catch {
+            // ignore non-matching logs
+          }
+        }
+      }
+      if (!createdTenderId) {
+        try {
+          const readOnly = getReadOnlyContract();
+          createdTenderId = Number(await readOnly.tenderCount());
+        } catch {
+          createdTenderId = tenders.length + 1;
+        }
+      }
+
+      // Save title in localStorage by tender id and hash
+      if (createdTenderId) {
+        localStorage.setItem(`opentender_title_${createdTenderId}`, titleText);
+      }
+      localStorage.setItem(`opentender_title_hash_${documentHash.toLowerCase()}`, titleText);
+
+      setNotification({
+        active: false,
+        hash: tx.hash,
+        title: "Tender Published Successfully!",
+        success: `Tender #${createdTenderId || ""} ("${titleText}") published. Sealed bidding is active.`,
+      });
+
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      const msg = parseContractError(err);
+      setNotification({ active: false, title: "Failed to publish tender", error: msg });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // ==========================================================================
+  // STEP 4: Section "My tenders" Data & Handlers
+  // ==========================================================================
+  const myTenders = useMemo(() => {
+    if (!account || !tenders) return [];
+    return tenders.filter(
+      (t) => t.department && t.department.toLowerCase() === account.toLowerCase()
+    );
+  }, [account, tenders]);
+
+  // Fetch milestones for my funded tenders
+  const [tenderMilestonesMap, setTenderMilestonesMap] = useState({});
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchMilestones() {
+      if (!account || !myTenders || myTenders.length === 0) {
+        if (isMounted) setTenderMilestonesMap({});
+        return;
+      }
+      const fundedDeptTenders = myTenders.filter((t) => t.status === 3);
+      if (fundedDeptTenders.length === 0) return;
+
+      try {
+        const contract = getReadOnlyContract();
+        const results = {};
+        await Promise.all(
+          fundedDeptTenders.map(async (t) => {
+            try {
+              const ms = await contract.getMilestones(t.id);
+              results[t.id] = ms.map((m) => ({
+                percentageBps: Number(m.percentageBps),
+                dueDate: Number(m.dueDate),
+                submittedAt: Number(m.submittedAt),
+                evidenceHash: m.evidenceHash,
+                approvalCount: Number(m.approvalCount),
+                status: Number(m.status), // 0: Pending, 1: Submitted, 2: Approved
+                payoutAmount: m.payoutAmount,
+                penaltyDeducted: m.penaltyDeducted,
+              }));
+            } catch {
+              // ignore
+            }
+          })
+        );
+        if (isMounted) setTenderMilestonesMap(results);
+      } catch {
+        // ignore
+      }
+    }
+    fetchMilestones();
+  }, [account, myTenders, latestBlockTimestamp]);
+
+  // Lifecycle actions for My tenders
+  async function handleFinalizeAward(tenderId) {
+    if (!signerContract || isSubmitting) return;
+    try {
+      setSubmittingTenderId(tenderId);
+      setIsSubmitting(true);
+      setNotification({ active: true, title: `Finalizing award for Tender #${tenderId}...` });
+
+      const tx = await signerContract.finalizeAward(tenderId);
+      setNotification({ active: true, title: "Confirming winner on-chain...", hash: tx.hash });
+      await tx.wait();
+
+      setNotification({
+        active: false,
+        hash: tx.hash,
+        title: "Winner Chosen!",
+        success: `Tender #${tenderId} award finalized. Awaiting escrow funding.`,
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setNotification({ active: false, title: "Finalization Failed", error: parseContractError(err) });
+    } finally {
+      setIsSubmitting(false);
+      setSubmittingTenderId(null);
+    }
+  }
+
+  async function handleFundEscrow(tenderId, winningAmount) {
+    if (!signerContract || isSubmitting) return;
+    try {
+      setSubmittingTenderId(tenderId);
+      setIsSubmitting(true);
+      setNotification({ active: true, title: `Funding escrow for Tender #${tenderId}...` });
+
+      const tx = await signerContract.fundEscrow(tenderId, { value: winningAmount });
+      setNotification({ active: true, title: "Locking funds in escrow...", hash: tx.hash });
+      await tx.wait();
+
+      setNotification({
+        active: false,
+        hash: tx.hash,
+        title: "Escrow Funded!",
+        success: `Successfully funded ${ethers.formatEther(winningAmount)} ${CURRENCY_SYMBOL} into escrow. Work can now begin.`,
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setNotification({ active: false, title: "Funding Failed", error: parseContractError(err) });
+    } finally {
+      setIsSubmitting(false);
+      setSubmittingTenderId(null);
+    }
+  }
+
+  async function handleCancelUnfundedTender(tenderId) {
+    if (!signerContract || isSubmitting) return;
+    try {
+      setSubmittingTenderId(tenderId);
+      setIsSubmitting(true);
+      setNotification({ active: true, title: `Cancelling unfunded Tender #${tenderId}...` });
+
+      const tx = await signerContract.cancelUnfundedTender(tenderId);
+      setNotification({ active: true, title: "Confirming cancellation...", hash: tx.hash });
+      await tx.wait();
+
+      setNotification({
+        active: false,
+        hash: tx.hash,
+        title: "Tender Cancelled",
+        success: `Tender #${tenderId} was cancelled because escrow was not funded in time.`,
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setNotification({ active: false, title: "Cancellation Failed", error: parseContractError(err) });
+    } finally {
+      setIsSubmitting(false);
+      setSubmittingTenderId(null);
+    }
+  }
+
+  async function handleCancelTender(tenderId) {
+    if (!signerContract || isSubmitting) return;
+    try {
+      setSubmittingTenderId(tenderId);
+      setIsSubmitting(true);
+      setNotification({ active: true, title: `Cancelling Tender #${tenderId}...` });
+
+      const tx = await signerContract.cancelTender(tenderId, "Cancelled by department");
+      setNotification({ active: true, title: "Confirming cancellation...", hash: tx.hash });
+      await tx.wait();
+
+      setNotification({
+        active: false,
+        hash: tx.hash,
+        title: "Tender Cancelled",
+        success: `Tender #${tenderId} cancelled by department. Deposits unlocked for refund.`,
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setNotification({ active: false, title: "Cancellation Failed", error: parseContractError(err) });
+    } finally {
+      setIsSubmitting(false);
+      setSubmittingTenderId(null);
+    }
+  }
+
+  async function handleDeclareDefault(tenderId) {
+    if (!signerContract || isSubmitting) return;
+    try {
+      setSubmittingTenderId(tenderId);
+      setIsSubmitting(true);
+      setNotification({ active: true, title: `Declaring default for Tender #${tenderId}...` });
+
+      const tx = await signerContract.declareDefault(tenderId);
+      setNotification({ active: true, title: "Declaring default on-chain...", hash: tx.hash });
+      await tx.wait();
+
+      setNotification({
+        active: false,
+        hash: tx.hash,
+        title: "Default Declared",
+        success: `Contractor default recorded for Tender #${tenderId}. Remaining escrow recovered.`,
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setNotification({ active: false, title: "Default Declaration Failed", error: parseContractError(err) });
+    } finally {
+      setIsSubmitting(false);
+      setSubmittingTenderId(null);
+    }
+  }
+
+  // Retrieve stored title from localStorage
+  function getTenderTitle(t) {
+    if (!t) return "";
+    const byId = localStorage.getItem(`opentender_title_${t.id}`);
+    if (byId) return byId;
+    if (t.documentHash) {
+      const byHash = localStorage.getItem(`opentender_title_hash_${t.documentHash.toLowerCase()}`);
+      if (byHash) return byHash;
+    }
+    return "";
+  }
+
+  // Exact status label matching Tenders page
+  function getTenderStatus(t, now) {
+    if (!t) return { label: "", countdown: null };
+    const status = Number(t.status);
+    if (status === 1) {
+      if (now <= Number(t.commitDeadline)) {
+        return {
+          label: "Taking sealed bids",
+          countdown: formatCountdown(Number(t.commitDeadline), now),
+        };
+      }
+      if (now <= Number(t.revealDeadline)) {
+        return {
+          label: "Opening bids",
+          countdown: formatCountdown(Number(t.revealDeadline), now),
+        };
+      }
+      return {
+        label: "Ready to choose the winner",
+        countdown: null,
+      };
+    }
+    if (status === 2) return { label: "Winner chosen, waiting for the contract money", countdown: null };
+    if (status === 3) return { label: "Work in progress", countdown: null };
+    if (status === 4) return { label: "Completed and paid", countdown: null };
+    if (status === 5) return { label: "No valid bids", countdown: null };
+    if (status === 6) return { label: "Cancelled", countdown: null };
+    if (status === 7) return { label: "Contractor missed the deadline", countdown: null };
+    return { label: "Unknown", countdown: null };
+  }
+
+  // Determine ONLY the next valid action per Step 4
+  function getNextAction(t, now, milestones = []) {
+    const status = Number(t.status);
+
+    // 1. Open
+    if (status === 1) {
+      if (now <= Number(t.commitDeadline)) {
+        return {
+          description: "Cancel tender before the bidding phase ends and unlock deposits.",
+          buttonText: "Cancel this tender",
+          action: () => handleCancelTender(t.id),
+          disabled: false,
+          buttonClass: "btn-warning",
+        };
+      }
+      if (now <= Number(t.revealDeadline)) {
+        const waitSec = Number(t.revealDeadline) - now;
+        return {
+          description: "Bids are currently being unsealed on-chain.",
+          buttonText: `Opening ends in ${formatMinutesSeconds(waitSec)}`,
+          action: null,
+          disabled: true,
+          buttonClass: "btn-secondary",
+        };
+      }
+      // after revealDeadline
+      return {
+        description: "Bidding and opening have concluded. Select the winning contractor.",
+        buttonText: "Choose the winner",
+        action: () => handleFinalizeAward(t.id),
+        disabled: false,
+        buttonClass: "btn-primary",
+      };
+    }
+
+    // 2. Awarded
+    if (status === 2) {
+      const winningAmtStr = `${ethers.formatEther(t.winningAmount || 0n)} ${CURRENCY_SYMBOL}`;
+      if (now <= Number(t.escrowDeadline)) {
+        return {
+          description: "Winner chosen. Fund the contract escrow to start milestone work.",
+          buttonText: `Deposit the contract money (${winningAmtStr})`,
+          action: () => handleFundEscrow(t.id, t.winningAmount),
+          disabled: false,
+          buttonClass: "btn-primary",
+        };
+      }
+      // after escrowDeadline
+      return {
+        description: "Escrow funding window has expired on-chain.",
+        buttonText: "Cancel: not funded in time",
+        action: () => handleCancelUnfundedTender(t.id),
+        disabled: false,
+        buttonClass: "btn-danger",
+      };
+    }
+
+    // 3. Funded
+    if (status === 3) {
+      const currentMilestoneIdx = Number(t.completedMilestones || 0);
+      const m = milestones && milestones[currentMilestoneIdx];
+
+      if (m) {
+        const isWaiting = m.status === 0; // Pending / Waiting
+        const defaultEligibleTime = Number(m.dueDate) + Number(t.gracePeriod);
+
+        if (isWaiting && now > defaultEligibleTime) {
+          return {
+            description: "Contractor has missed the milestone deadline and grace period.",
+            buttonText: "Declare missed deadline",
+            action: () => handleDeclareDefault(t.id),
+            disabled: false,
+            buttonClass: "btn-danger",
+          };
+        }
+
+        if (m.status === 1) {
+          return {
+            description: "Contractor submitted proof; waiting for verifier review.",
+            buttonText: "Waiting for verifier review",
+            action: null,
+            disabled: true,
+            buttonClass: "btn-secondary",
+          };
+        }
+
+        if (now <= Number(m.dueDate)) {
+          const diff = Number(m.dueDate) - now;
+          return {
+            description: `Contractor is executing Milestone #${currentMilestoneIdx + 1}.`,
+            buttonText: `Milestone in progress (Due in ${formatMinutesSeconds(diff)})`,
+            action: null,
+            disabled: true,
+            buttonClass: "btn-secondary",
+          };
+        }
+
+        // In grace period
+        const diff = defaultEligibleTime - now;
+        return {
+          description: "Milestone due date passed. Grace period is running.",
+          buttonText: `Grace period active (${formatMinutesSeconds(diff)} left)`,
+          action: null,
+          disabled: true,
+          buttonClass: "btn-secondary",
+        };
+      }
+
+      return {
+        description: "Milestone execution in progress.",
+        buttonText: "Work in progress",
+        action: null,
+        disabled: true,
+        buttonClass: "btn-secondary",
+      };
+    }
+
+    // 4. Completed
+    if (status === 4) {
+      return {
+        description: "All milestones delivered and approved.",
+        buttonText: "Tender completed",
+        action: null,
+        disabled: true,
+        buttonClass: "btn-secondary",
+      };
+    }
+
+    // 5. Failed
+    if (status === 5) {
+      return {
+        description: "Tender concluded with no valid bids.",
+        buttonText: "No valid bids",
+        action: null,
+        disabled: true,
+        buttonClass: "btn-secondary",
+      };
+    }
+
+    // 6. Cancelled
+    if (status === 6) {
+      return {
+        description: "Tender was cancelled by department.",
+        buttonText: "Tender cancelled",
+        action: null,
+        disabled: true,
+        buttonClass: "btn-secondary",
+      };
+    }
+
+    // 7. Defaulted
+    if (status === 7) {
+      return {
+        description: "Contractor defaulted on delivery deadline.",
+        buttonText: "Contractor defaulted",
+        action: null,
+        disabled: true,
+        buttonClass: "btn-secondary",
+      };
+    }
+
+    return {
+      description: "No action available.",
+      buttonText: "No action",
+      action: null,
+      disabled: true,
+      buttonClass: "btn-secondary",
+    };
+  }
+
+  // ==========================================================================
+  // Milestone Verification & Registrar Handlers (Preserved & Untouched)
+  // ==========================================================================
+  const isMilestoneIdxValid =
+    !isNaN(verifyMilestoneIdx) && parseInt(verifyMilestoneIdx, 10) >= 0;
+
+  const isVerifierActionAllowed =
+    Boolean(selectedVerifyTender) &&
+    selectedVerifyTender.status === 3 &&
+    isMilestoneIdxValid &&
+    isVerifierRole;
+
+  async function handleApproveMilestone() {
+    if (!signerContract || !isVerifierActionAllowed || isSubmitting) return;
+    try {
+      setIsSubmitting(true);
+      setNotification({
+        active: true,
+        title: `Signing Off Milestone #${verifyMilestoneIdx} for Tender #${verifyTenderId}...`,
+      });
+      const tx = await signerContract.approveMilestone(verifyTenderId, parseInt(verifyMilestoneIdx, 10));
+      setNotification({ active: true, title: "Recording verification...", hash: tx.hash });
+      await tx.wait();
+      setNotification({
+        active: false,
+        hash: tx.hash,
+        title: "Milestone Approved!",
+        success: "Your verifier sign-off was registered. If threshold was met, funds were automatically released.",
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setNotification({ active: false, title: "Milestone Approval Failed", error: parseContractError(err) });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   const isRegDeptValid = regDeptAddress.trim().length > 0 && ethers.isAddress(regDeptAddress.trim());
   const isRegVerifierValid = regVerifierAddress.trim().length > 0 && ethers.isAddress(regVerifierAddress.trim());
   const isRegBidderAddrValid = regBidderAddress.trim().length > 0 && ethers.isAddress(regBidderAddress.trim());
@@ -229,320 +766,6 @@ export default function OfficerTab({
   const isDebarReasonValid = debarReason.trim().length > 0;
   const isDebarFormValid = isDebarAddrValid && isDebarReasonValid;
 
-  // ==========================================================================
-  // Lifecycle Action Availability Helpers
-  // ==========================================================================
-  const finalizeEligibility = useMemo(() => {
-    if (!selectedActionTender) {
-      return { allowed: false, reason: "Select a target tender first" };
-    }
-    if (selectedActionTender.status !== 1) {
-      return {
-        allowed: false,
-        reason: `Tender is in status ${STATUS_NAMES[selectedActionTender.status] || selectedActionTender.status}. Only Open tenders can be finalized.`
-      };
-    }
-    if (currentBlockTime <= selectedActionTender.revealDeadline) {
-      const waitSec = selectedActionTender.revealDeadline - currentBlockTime;
-      const waitMin = Math.ceil(waitSec / 60);
-      return {
-        allowed: false,
-        reason: `Reveal phase is currently active (~${waitMin}m remaining). Finalization unlocks after reveal deadline.`
-      };
-    }
-    return {
-      allowed: true,
-      reason: "Reveal deadline has ended. Award finalization is ready to execute."
-    };
-  }, [selectedActionTender, currentBlockTime]);
-
-  const fundEscrowEligibility = useMemo(() => {
-    if (!selectedActionTender) {
-      return { allowed: false, reason: "Select a target tender first" };
-    }
-    if (selectedActionTender.status !== 2) {
-      return {
-        allowed: false,
-        reason: `Tender must be in Awarded status to fund escrow (currently ${STATUS_NAMES[selectedActionTender.status] || selectedActionTender.status}).`
-      };
-    }
-    if (selectedActionTender.escrowDeadline && currentBlockTime > selectedActionTender.escrowDeadline) {
-      return {
-        allowed: false,
-        reason: "Escrow funding window has expired on-chain."
-      };
-    }
-    if (!isTenderDepartment) {
-      return {
-        allowed: false,
-        reason: "Only the issuing Department wallet can fund contract escrow."
-      };
-    }
-    return {
-      allowed: true,
-      reason: `Ready to fund winning price (${ethers.formatEther(selectedActionTender.winningAmount || 0n)} ${CURRENCY_SYMBOL}) into escrow.`
-    };
-  }, [selectedActionTender, currentBlockTime, isTenderDepartment]);
-
-  const cancelEligibility = useMemo(() => {
-    if (!selectedActionTender) {
-      return { allowed: false, reason: "Select a target tender first" };
-    }
-    if (selectedActionTender.status !== 1) {
-      return {
-        allowed: false,
-        reason: `Only Open tenders can be cancelled (currently ${STATUS_NAMES[selectedActionTender.status] || selectedActionTender.status}).`
-      };
-    }
-    if (currentBlockTime > selectedActionTender.commitDeadline) {
-      return {
-        allowed: false,
-        reason: "Commit deadline has passed; cancellation is closed on-chain."
-      };
-    }
-    if (!isTenderDepartment) {
-      return {
-        allowed: false,
-        reason: "Only the publishing Department wallet can cancel this tender."
-      };
-    }
-    if (cancelReason.trim().length === 0) {
-      return {
-        allowed: false,
-        reason: "Cancellation reason must not be empty."
-      };
-    }
-    return {
-      allowed: true,
-      reason: "Within pre-commit window. Cancellation will unlock all committed bonds for refund."
-    };
-  }, [selectedActionTender, currentBlockTime, isTenderDepartment, cancelReason]);
-
-  const defaultEligibility = useMemo(() => {
-    if (!selectedActionTender) {
-      return { allowed: false, reason: "Select a target tender first" };
-    }
-    if (selectedActionTender.status !== 3) {
-      return {
-        allowed: false,
-        reason: `Only Funded tenders in active execution can default (currently ${STATUS_NAMES[selectedActionTender.status] || selectedActionTender.status}).`
-      };
-    }
-    return {
-      allowed: true,
-      reason: "Enforces default if pending milestone passes due date + grace period. Performance bond forfeited, remaining escrow recovered."
-    };
-  }, [selectedActionTender]);
-
-  // ==========================================================================
-  // Milestone Verification Availability
-  // ==========================================================================
-  const isMilestoneIdxValid =
-    !isNaN(verifyMilestoneIdx) && parseInt(verifyMilestoneIdx, 10) >= 0;
-
-  const isVerifierActionAllowed =
-    Boolean(selectedVerifyTender) &&
-    selectedVerifyTender.status === 3 &&
-    isMilestoneIdxValid &&
-    isVerifierRole;
-
-  // Pre-fill demo values (Never triggers a transaction automatically)
-  function handleFillDemo() {
-    setCeilingPrice("0.02");
-    setBidBond("0.002");
-    setCommitMins("3");
-    setRevealMins("3");
-    setEscrowHours("1");
-    setGraceHours("1");
-    setPenaltyBps("200");
-    setDocHash("LIVE_BUILDATHON_DEMO_SPEC");
-    setVerifiersText(DEMO_VERIFIERS);
-    setThreshold("2");
-  }
-
-  // ==========================================================================
-  // Transaction Handlers (Preserved Handlers)
-  // ==========================================================================
-  async function handleCreateTender(e) {
-    e.preventDefault();
-    if (!signerContract || !isCreateTenderValid || isSubmitting) return;
-
-    try {
-      setIsSubmitting(true);
-      setNotification({ active: true, title: "Creating New Tender On-Chain..." });
-
-      const latestBlock = await signerContract.runner.provider.getBlock("latest").catch(() => null);
-      const now = latestBlock ? Number(latestBlock.timestamp) : Math.floor(Date.now() / 1000);
-      const commitDeadline = now + parsedCommitMins * 60;
-      const revealDeadline = commitDeadline + parsedRevealMins * 60;
-      const escrowWindow = parsedEscrowHours * 3600;
-      const gracePeriod = parsedGraceHours * 3600;
-
-      // 3 milestones: 30%, 30%, 40% with due dates relative to reveal deadline (+20m, +40m, +60m)
-      const milestones = [
-        { percentageBps: 3000, dueDate: revealDeadline + 20 * 60 },
-        { percentageBps: 3000, dueDate: revealDeadline + 40 * 60 },
-        { percentageBps: 4000, dueDate: revealDeadline + 60 * 60 }
-      ];
-
-      const documentHash =
-        docHash.startsWith("0x") && docHash.length === 66
-          ? docHash
-          : ethers.id(docHash.trim());
-
-      const tx = await signerContract.createTender(
-        ethers.parseEther(ceilingPrice),
-        ethers.parseEther(bidBond),
-        commitDeadline,
-        revealDeadline,
-        escrowWindow,
-        gracePeriod,
-        parsedPenaltyBps,
-        documentHash,
-        milestones,
-        verifierAddresses,
-        parsedThreshold
-      );
-
-      setNotification({ active: true, title: "Mining Tender Creation...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Tender Created Successfully!",
-        success: "Tender specification has been published. Sealed bid commit phase is now active."
-      });
-      onRefresh();
-    } catch (err) {
-      const msg = parseContractError(err);
-      setNotification({ active: false, title: "Tender Creation Failed", error: msg });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleFinalizeAward() {
-    if (!signerContract || !finalizeEligibility.allowed || isSubmitting) return;
-    try {
-      setIsSubmitting(true);
-      setNotification({ active: true, title: `Finalizing Award for Tender #${actionTenderId}...` });
-      const tx = await signerContract.finalizeAward(actionTenderId);
-      setNotification({ active: true, title: "Confirming award...", hash: tx.hash });
-      await tx.wait();
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Tender Finalized & Awarded",
-        success: "Winning bidder determined. Non-reveal bonds forfeited to Department pull balance."
-      });
-      onRefresh();
-    } catch (err) {
-      const msg = parseContractError(err);
-      setNotification({ active: false, title: "Finalization Failed", error: msg });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleFundEscrow() {
-    if (!signerContract || !fundEscrowEligibility.allowed || isSubmitting) return;
-    try {
-      setIsSubmitting(true);
-      setNotification({ active: true, title: `Funding Escrow for Tender #${actionTenderId}...` });
-      const details = await getReadOnlyContract().getTenderDetails(actionTenderId);
-      const winningAmount = details.winningAmount;
-
-      const tx = await signerContract.fundEscrow(actionTenderId, { value: winningAmount });
-      setNotification({ active: true, title: "Locking funds in escrow...", hash: tx.hash });
-      await tx.wait();
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Escrow Funded!",
-        success: `Successfully funded ${ethers.formatEther(winningAmount)} ${CURRENCY_SYMBOL} into smart contract escrow.`
-      });
-      onRefresh();
-    } catch (err) {
-      const msg = parseContractError(err);
-      setNotification({ active: false, title: "Escrow Funding Failed", error: msg });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleCancelTender() {
-    if (!signerContract || !cancelEligibility.allowed || isSubmitting) return;
-    try {
-      setIsSubmitting(true);
-      setNotification({ active: true, title: `Cancelling Tender #${actionTenderId}...` });
-      const tx = await signerContract.cancelTender(actionTenderId, cancelReason);
-      setNotification({ active: true, title: "Confirming cancellation...", hash: tx.hash });
-      await tx.wait();
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Tender Cancelled",
-        success: "Tender cancelled. Committed bid bonds are now unlocked for pull refund."
-      });
-      onRefresh();
-    } catch (err) {
-      const msg = parseContractError(err);
-      setNotification({ active: false, title: "Cancellation Failed", error: msg });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleDeclareDefault() {
-    if (!signerContract || !defaultEligibility.allowed || isSubmitting) return;
-    try {
-      setIsSubmitting(true);
-      setNotification({ active: true, title: `Declaring Default on Tender #${actionTenderId}...` });
-      const tx = await signerContract.declareDefault(actionTenderId);
-      setNotification({ active: true, title: "Executing default...", hash: tx.hash });
-      await tx.wait();
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Contractor Default Declared",
-        success: "Performance bond forfeited, remaining escrow recovered, contractor debarred."
-      });
-      onRefresh();
-    } catch (err) {
-      const msg = parseContractError(err);
-      setNotification({ active: false, title: "Default Declaration Failed", error: msg });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleApproveMilestone() {
-    if (!signerContract || !isVerifierActionAllowed || isSubmitting) return;
-    try {
-      setIsSubmitting(true);
-      setNotification({
-        active: true,
-        title: `Signing Off Milestone #${verifyMilestoneIdx} for Tender #${verifyTenderId}...`
-      });
-      const tx = await signerContract.approveMilestone(verifyTenderId, parseInt(verifyMilestoneIdx, 10));
-      setNotification({ active: true, title: "Recording verification...", hash: tx.hash });
-      await tx.wait();
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Milestone Approved!",
-        success: "Your verifier sign-off was registered. If threshold was met, funds were automatically released."
-      });
-      onRefresh();
-    } catch (err) {
-      const msg = parseContractError(err);
-      setNotification({ active: false, title: "Milestone Approval Failed", error: msg });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
   async function handleRegisterDepartment() {
     if (!signerContract || !isRegDeptValid || isSubmitting) return;
     try {
@@ -553,10 +776,10 @@ export default function OfficerTab({
       setNotification({
         active: false,
         title: "Department Registered",
-        success: `Granted DEPARTMENT_ROLE to ${regDeptAddress.trim()}`
+        success: `Granted DEPARTMENT_ROLE to ${regDeptAddress.trim()}`,
       });
       setRegDeptAddress("");
-      onRefresh();
+      if (onRefresh) onRefresh();
     } catch (err) {
       setNotification({ active: false, title: "Registration Failed", error: parseContractError(err) });
     } finally {
@@ -574,10 +797,10 @@ export default function OfficerTab({
       setNotification({
         active: false,
         title: "Verifier Registered",
-        success: `Granted VERIFIER_ROLE to ${regVerifierAddress.trim()}`
+        success: `Granted VERIFIER_ROLE to ${regVerifierAddress.trim()}`,
       });
       setRegVerifierAddress("");
-      onRefresh();
+      if (onRefresh) onRefresh();
     } catch (err) {
       setNotification({ active: false, title: "Registration Failed", error: parseContractError(err) });
     } finally {
@@ -599,10 +822,10 @@ export default function OfficerTab({
       setNotification({
         active: false,
         title: "Bidder Registered",
-        success: `Bidder ${regBidderAddress.trim()} registered with Group ID: ${regGroupId.trim()}`
+        success: `Bidder ${regBidderAddress.trim()} registered with Group ID: ${regGroupId.trim()}`,
       });
       setRegBidderAddress("");
-      onRefresh();
+      if (onRefresh) onRefresh();
     } catch (err) {
       setNotification({ active: false, title: "Registration Failed", error: parseContractError(err) });
     } finally {
@@ -620,10 +843,10 @@ export default function OfficerTab({
       setNotification({
         active: false,
         title: "Bidder Debarred",
-        success: `Wallet ${debarAddress.trim()} is now formally debarred from tender participation.`
+        success: `Wallet ${debarAddress.trim()} is now formally debarred from tender participation.`,
       });
       setDebarAddress("");
-      onRefresh();
+      if (onRefresh) onRefresh();
     } catch (err) {
       setNotification({ active: false, title: "Debarment Failed", error: parseContractError(err) });
     } finally {
@@ -631,474 +854,371 @@ export default function OfficerTab({
     }
   }
 
+  // ==========================================================================
+  // Render
+  // ==========================================================================
   return (
     <div className="tab-pane officer-tab">
       <div className="officer-grid">
         {/* ================================================================= */}
-        {/* Panel 1: Department: Create Tender                                */}
+        {/* STEP 1: Section "Department: publish a tender"                    */}
         {/* ================================================================= */}
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h3>Publish Public Tender</h3>
-              <p className="field-hint" style={{ marginTop: "0.2rem" }}>
+              <h3>Department: publish a tender</h3>
+              <p className="panel-sub" style={{ marginTop: "0.2rem" }}>
                 Define procurement specifications, ceiling price, and multi-verifier escrow quorum.
               </p>
             </div>
             <button
               type="button"
               className="btn-mini btn-secondary"
-              onClick={handleFillDemo}
-              title="Populate testnet parameters without submitting"
+              onClick={handleFillDemoValues}
+              disabled={!isDeptRole || !account}
+              title="Populate demo values for testing"
             >
-              Fill Demo Values
+              Fill demo values
             </button>
           </div>
 
           {!isDeptRole && (
-            <div className="portal-alert warning" style={{ margin: "1rem 0" }}>
+            <div className="portal-alert alert-warning" style={{ margin: "1rem 0" }}>
               <span className="portal-alert-icon">⚠️</span>
-              <div>
-                <strong>Department Role Required</strong>
-                <p>
-                  {account ? (
-                    <>
-                      Connected wallet <code>{`${account.slice(0, 6)}...${account.slice(-4)}`}</code> does not hold{" "}
-                      <code>DEPARTMENT_ROLE</code> on-chain. Tender creation will revert unless authorized.
-                    </>
-                  ) : (
-                    <>
-                      No wallet connected. Publishing a tender requires a wallet authorized with{" "}
-                      <code>DEPARTMENT_ROLE</code>.
-                    </>
-                  )}
-                </p>
+              <div className="portal-alert-body">
+                <strong>Department Access Required:</strong> Connect a department wallet to use this section.
               </div>
             </div>
           )}
 
-          <form onSubmit={handleCreateTender} className="form-card">
+          <form onSubmit={handlePublishTender} className="form-card">
+            {/* Field: Project title */}
+            <div className="form-group">
+              <label>Project title</label>
+              <input
+                type="text"
+                placeholder="e.g. Demo road repair"
+                value={projectTitle}
+                disabled={!isDeptRole || !account || isWrongNetwork}
+                onChange={(e) => setProjectTitle(e.target.value)}
+                required
+              />
+              <div className="field-hint">
+                Hashed with keccak256 into documentHash and saved locally by tender ID.
+              </div>
+              {!isTitleValid && (
+                <div className="field-validation-error">Project title is required.</div>
+              )}
+            </div>
+
+            {/* Price & Deposit */}
             <div className="form-row">
               <div className="form-group col-half">
-                <label>Ceiling Price ({CURRENCY_SYMBOL})</label>
+                <label>Maximum price ({CURRENCY_SYMBOL})</label>
                 <input
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.0001"
+                  min="0.0001"
+                  placeholder="e.g. 0.02"
                   value={ceilingPrice}
+                  disabled={!isDeptRole || !account || isWrongNetwork}
                   onChange={(e) => setCeilingPrice(e.target.value)}
-                  placeholder="e.g. 50"
                   required
                 />
-                {!isCeilingValid && (
-                  <div className="field-validation-error">Ceiling price must be greater than 0.</div>
+                {!isPricePositive && (
+                  <div className="field-validation-error">Maximum price must be greater than 0.</div>
                 )}
               </div>
               <div className="form-group col-half">
-                <label>Bid Bond Deposit ({CURRENCY_SYMBOL})</label>
+                <label>Deposit ({CURRENCY_SYMBOL})</label>
                 <input
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.0001"
+                  min="0.0001"
+                  placeholder="e.g. 0.002"
                   value={bidBond}
+                  disabled={!isDeptRole || !account || isWrongNetwork}
                   onChange={(e) => setBidBond(e.target.value)}
-                  placeholder="e.g. 2"
                   required
                 />
-                {!isBidBondValid && (
-                  <div className="field-validation-error">Bid bond must be greater than 0.</div>
+                {!isDepositPositive && (
+                  <div className="field-validation-error">Deposit must be greater than 0.</div>
+                )}
+                {isDepositPositive && !isDepositLessThanPrice && (
+                  <div className="field-validation-error">Deposit must be strictly less than maximum price.</div>
                 )}
               </div>
             </div>
 
+            {/* Bidding time & Opening time */}
             <div className="form-row">
               <div className="form-group col-half">
-                <label>Commit Duration (Minutes)</label>
+                <label>Bidding time (minutes)</label>
                 <input
                   type="number"
                   min="1"
-                  value={commitMins}
-                  onChange={(e) => setCommitMins(e.target.value)}
                   placeholder="e.g. 3"
+                  value={commitMins}
+                  disabled={!isDeptRole || !account || isWrongNetwork}
+                  onChange={(e) => setCommitMins(e.target.value)}
                   required
                 />
                 {!isCommitMinsValid && (
-                  <div className="field-validation-error">Commit duration must be at least 1 minute.</div>
+                  <div className="field-validation-error">Bidding time must be at least 1 minute.</div>
                 )}
               </div>
               <div className="form-group col-half">
-                <label>Reveal Duration (Minutes)</label>
+                <label>Opening time (minutes)</label>
                 <input
                   type="number"
                   min="1"
-                  value={revealMins}
-                  onChange={(e) => setRevealMins(e.target.value)}
                   placeholder="e.g. 3"
+                  value={revealMins}
+                  disabled={!isDeptRole || !account || isWrongNetwork}
+                  onChange={(e) => setRevealMins(e.target.value)}
                   required
                 />
                 {!isRevealMinsValid && (
-                  <div className="field-validation-error">Reveal duration must be at least 1 minute.</div>
+                  <div className="field-validation-error">Opening time must be at least 1 minute.</div>
                 )}
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group col-half">
-                <label>Escrow Window (Hours)</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={escrowHours}
-                  onChange={(e) => setEscrowHours(e.target.value)}
-                  placeholder="e.g. 1"
-                  required
-                />
-                {!isEscrowHoursValid && (
-                  <div className="field-validation-error">Escrow window must be at least 1 hour.</div>
-                )}
-              </div>
-              <div className="form-group col-half">
-                <label>Grace Period (Hours)</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={graceHours}
-                  onChange={(e) => setGraceHours(e.target.value)}
-                  placeholder="e.g. 24"
-                  required
-                />
-                {!isGraceHoursValid && (
-                  <div className="field-validation-error">Grace period must be at least 1 hour.</div>
-                )}
-              </div>
-            </div>
+            {/* STEP 2: Collapsed Advanced Section */}
+            <details className="advanced-salt-details" style={{ marginTop: "0.25rem" }}>
+              <summary className="advanced-salt-summary">
+                <span>Advanced Settings</span>
+                <span className="details-chevron">▾</span>
+              </summary>
+              <div className="advanced-salt-content">
+                {/* Late penalty per day in PERCENT */}
+                <div className="form-group" style={{ marginBottom: "0.85rem" }}>
+                  <label>Late penalty per day in PERCENT (max 10%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                    placeholder="2"
+                    value={penaltyPercent}
+                    disabled={!isDeptRole || !account || isWrongNetwork}
+                    onChange={(e) => setPenaltyPercent(e.target.value)}
+                    required
+                  />
+                  <div className="field-hint">
+                    Default 2% per day (sent as 200 basis points; contract maximum 10%).
+                  </div>
+                  {!isPenaltyValid && (
+                    <div className="field-validation-error">
+                      Penalty must be between 0% and 10% per day.
+                    </div>
+                  )}
+                </div>
 
-            <div className="form-group">
-              <label>Daily Penalty (BPS: 200 = 2%/day)</label>
-              <input
-                type="number"
-                min="0"
-                max="1000"
-                value={penaltyBps}
-                onChange={(e) => setPenaltyBps(e.target.value)}
-                placeholder="0 - 1000"
-                required
-              />
-              <div className="field-hint">
-                Late delivery deduction: 100 BPS = 1% per full day late (contract maximum: 1000 BPS / 10% daily).
+                {/* Funding window & Grace period in hours */}
+                <div className="form-row" style={{ marginBottom: "0.85rem" }}>
+                  <div className="form-group col-half">
+                    <label>Funding window in hours</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      value={escrowHours}
+                      disabled={!isDeptRole || !account || isWrongNetwork}
+                      onChange={(e) => setEscrowHours(e.target.value)}
+                      required
+                    />
+                    {!isEscrowHoursValid && (
+                      <div className="field-validation-error">Funding window must be at least 1 hour.</div>
+                    )}
+                  </div>
+                  <div className="form-group col-half">
+                    <label>Grace period in hours</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      value={graceHours}
+                      disabled={!isDeptRole || !account || isWrongNetwork}
+                      onChange={(e) => setGraceHours(e.target.value)}
+                      required
+                    />
+                    {!isGraceHoursValid && (
+                      <div className="field-validation-error">Grace period must be at least 1 hour.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Verifiers */}
+                <div className="form-group" style={{ marginBottom: "0.85rem" }}>
+                  <label>Verifiers (Comma-Separated Addresses)</label>
+                  <textarea
+                    rows="2"
+                    value={verifiersText}
+                    disabled={!isDeptRole || !account || isWrongNetwork}
+                    onChange={(e) => setVerifiersText(e.target.value)}
+                    placeholder={DEMO_VERIFIERS}
+                    required
+                  />
+                  <div className="field-hint">
+                    {verifierAddresses.length > 0 ? (
+                      <span>
+                        ✓ {verifierAddresses.length} valid verifier address{verifierAddresses.length > 1 ? "es" : ""}{" "}
+                        parsed from DEMO_VERIFIERS
+                      </span>
+                    ) : (
+                      <span>Enter valid 42-character 0x addresses.</span>
+                    )}
+                  </div>
+                  {invalidVerifierTokens.length > 0 && (
+                    <div className="field-validation-error">
+                      Invalid address format: <code>{invalidVerifierTokens.join(", ")}</code>
+                    </div>
+                  )}
+                  {hasDuplicateVerifiers && (
+                    <div className="field-validation-error">Duplicate verifier addresses are not permitted.</div>
+                  )}
+                </div>
+
+                {/* Approvals needed */}
+                <div className="form-group" style={{ marginBottom: "0.85rem" }}>
+                  <label>Approvals needed</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={Math.max(1, verifierAddresses.length)}
+                    value={threshold}
+                    disabled={!isDeptRole || !account || isWrongNetwork}
+                    onChange={(e) => setThreshold(e.target.value)}
+                    placeholder="2"
+                    required
+                  />
+                  <div className="field-hint">
+                    Requires {threshold || 2} of {verifierAddresses.length || 0} verifier approvals to release escrow.
+                  </div>
+                  {!isThresholdValid && (
+                    <div className="field-validation-error">
+                      Approvals needed must be between 1 and the number of verifiers ({verifierAddresses.length}).
+                    </div>
+                  )}
+                </div>
+
+                {/* Fixed payment plan as plain text */}
+                <div className="form-group">
+                  <label>Payment Plan</label>
+                  <div className="milestone-plain-text-box" style={{ fontSize: "0.84rem", padding: "0.75rem 0.9rem" }}>
+                    Stage 1: 30% (reveal deadline + 20 min), Stage 2: 30% (+40 min), Stage 3: 40% (+60 min)
+                  </div>
+                </div>
               </div>
-              {!isPenaltyBpsValid && (
-                <div className="field-validation-error">
-                  Penalty rate must be between 0 and 1000 BPS (0% - 10%/day).
+            </details>
+
+            {/* Submit Action */}
+            <div className="action-button-row" style={{ marginTop: "0.75rem" }}>
+              <button
+                type="submit"
+                className="btn btn-primary btn-block"
+                disabled={!canPublishTender}
+              >
+                {isSubmitting ? "Publishing tender on-chain..." : "Publish tender"}
+              </button>
+              {publishDisabledReason && (
+                <div className="btn-disabled-reason">
+                  <span className="reason-bullet">ℹ</span> {publishDisabledReason}
                 </div>
               )}
             </div>
-
-            <div className="form-group">
-              <label>Specification Dossier Hash / Title</label>
-              <input
-                type="text"
-                value={docHash}
-                onChange={(e) => setDocHash(e.target.value)}
-                placeholder="e.g. MST_BUILDATHON_PROCUREMENT_V1 or 0x..."
-                required
-              />
-              <div className="field-hint">
-                Plaintext titles are automatically hashed via keccak256 into a canonical bytes32 digest.
-              </div>
-              {!isDocHashValid && (
-                <div className="field-validation-error">Document hash or title is required.</div>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>Authorized Verifiers (Comma-Separated Addresses)</label>
-              <textarea
-                rows="2"
-                value={verifiersText}
-                onChange={(e) => setVerifiersText(e.target.value)}
-                placeholder={DEMO_VERIFIERS}
-                required
-              />
-              <div className="field-hint">
-                {verifierAddresses.length > 0 ? (
-                  <span>
-                    ✓ {verifierAddresses.length} valid verifier address{verifierAddresses.length > 1 ? "es" : ""}{" "}
-                    parsed
-                  </span>
-                ) : (
-                  <span>Enter valid 42-character 0x Ethereum addresses.</span>
-                )}
-              </div>
-              {invalidVerifierTokens.length > 0 && (
-                <div className="field-validation-error">
-                  Invalid address format: <code>{invalidVerifierTokens.join(", ")}</code>
-                </div>
-              )}
-              {hasDuplicateVerifiers && (
-                <div className="field-validation-error">Duplicate verifier addresses are not permitted.</div>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>Approval Threshold (M-of-N)</label>
-              <input
-                type="number"
-                min="1"
-                max={Math.max(1, verifierAddresses.length)}
-                value={threshold}
-                onChange={(e) => setThreshold(e.target.value)}
-                placeholder="1"
-                required
-              />
-              <div className="field-hint">
-                Requires at least {threshold || 1} out of {verifierAddresses.length || 0} verifiers to sign off
-                before milestone escrow payout releases.
-              </div>
-              {!isThresholdValid && (
-                <div className="field-validation-error">
-                  Threshold must be between 1 and the number of valid verifiers ({verifierAddresses.length}).
-                </div>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>Milestone Delivery Schedule &amp; Payout Shares</label>
-              <div className="milestone-plain-text-box">
-                <div className="milestone-step-item">
-                  <span className="milestone-step-num">Milestone 1</span>
-                  <span className="milestone-step-due">Due at <strong>+20 minutes</strong> from reveal deadline</span>
-                  <span className="milestone-step-share">Payout share: <strong>30%</strong></span>
-                </div>
-                <div className="milestone-step-item">
-                  <span className="milestone-step-num">Milestone 2</span>
-                  <span className="milestone-step-due">Due at <strong>+40 minutes</strong> from reveal deadline</span>
-                  <span className="milestone-step-share">Payout share: <strong>30%</strong></span>
-                </div>
-                <div className="milestone-step-item">
-                  <span className="milestone-step-num">Milestone 3</span>
-                  <span className="milestone-step-due">Due at <strong>+60 minutes</strong> from reveal deadline</span>
-                  <span className="milestone-step-share">Payout share: <strong>40%</strong></span>
-                </div>
-              </div>
-              <div className="field-hint">
-                Milestone due dates are set relative to the reveal deadline. Escrow funds are released progressively upon verification.
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary btn-block"
-              disabled={isSubmitting || !isCreateTenderValid}
-            >
-              {isSubmitting ? "Publishing Tender On-Chain..." : "Publish Public Tender"}
-            </button>
           </form>
         </div>
 
         {/* ================================================================= */}
-        {/* Panel 2: Department: Tender Lifecycle Execution                   */}
+        {/* STEP 4: Section "My tenders"                                      */}
         {/* ================================================================= */}
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h3>Tender Lifecycle Management</h3>
-              <p className="field-hint" style={{ marginTop: "0.2rem" }}>
-                Enforce award finalization, escrow lockup, cancellation, and contractor default.
+              <h3>My tenders</h3>
+              <p className="panel-sub" style={{ marginTop: "0.2rem" }}>
+                Manage all procurement tenders published by your department wallet.
               </p>
             </div>
             <span className="badge badge-dept">Department Role</span>
           </div>
 
-          <div className="form-card">
-            <div className="form-group">
-              <label>Select Target Tender</label>
-              <select
-                value={actionTenderId}
-                onChange={(e) => setActionTenderId(e.target.value ? Number(e.target.value) : "")}
-                disabled={isDataLoading || isWrongNetwork || tenders.length === 0}
-              >
-                {isDataLoading && <option value="">⏳ Loading on-chain tenders from network...</option>}
-                {dataLoadError && <option value="">⚠️ Network read error: could not fetch tenders</option>}
-                {isWrongNetwork && <option value="">⚠️ Wrong network: connect to correct chain</option>}
-                {!isDataLoading && !dataLoadError && !isWrongNetwork && tenders.length === 0 && (
-                  <option value="">No tenders published on this network yet</option>
-                )}
-                {!isDataLoading && !dataLoadError && !isWrongNetwork && tenders.length > 0 && (
-                  <>
-                    <option value="">-- Select Target Tender --</option>
-                    {tenders.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        Tender #{t.id} ({STATUS_NAMES[t.status] || `Status ${t.status}`})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
+          {!account || !isDeptRole ? (
+            <div className="portal-alert alert-warning">
+              <span className="portal-alert-icon">⚠️</span>
+              <div className="portal-alert-body">
+                <strong>Department Access Required:</strong> Connect a department wallet to manage your tenders.
+              </div>
             </div>
+          ) : myTenders.length === 0 ? (
+            <div className="empty-tender-notice">
+              No tenders published by your department wallet yet. Use the form on the left to publish your first tender.
+            </div>
+          ) : (
+            <div className="my-tenders-list">
+              {myTenders.map((t) => {
+                const statusInfo = getTenderStatus(t, currentBlockTime);
+                const tenderTitle = getTenderTitle(t);
+                const nextAction = getNextAction(t, currentBlockTime, tenderMilestonesMap[t.id] || []);
+                const isThisSubmitting = isSubmitting && submittingTenderId === t.id;
 
-            {/* Target Tender Summary Box */}
-            {selectedActionTender ? (
-              <div className="tender-summary-box">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>Tender #{selectedActionTender.id} Overview</strong>
-                  <span className={`badge ${getStatusBadgeClass(selectedActionTender.status)}`}>
-                    {STATUS_NAMES[selectedActionTender.status] || `Status ${selectedActionTender.status}`}
-                  </span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem", marginTop: "0.25rem" }}>
-                  <div>
-                    <span style={{ color: "var(--text-muted)" }}>Dept: </span>
-                    <code style={{ fontSize: "0.75rem" }}>
-                      {selectedActionTender.department
-                        ? `${selectedActionTender.department.slice(0, 6)}...${selectedActionTender.department.slice(-4)}`
-                        : "--"}
-                    </code>
-                    {isTenderDepartment && (
-                      <span className="field-validation-success" style={{ marginLeft: "0.3rem", fontSize: "0.7rem" }}>
-                        (You)
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--text-muted)" }}>Ceiling: </span>
-                    <span>
-                      {ethers.formatEther(selectedActionTender.ceilingPrice || 0n)} {CURRENCY_SYMBOL}
-                    </span>
-                  </div>
-                  {selectedActionTender.winningBidder && selectedActionTender.winningBidder !== ethers.ZeroAddress && (
-                    <div style={{ gridColumn: "span 2" }}>
-                      <span style={{ color: "var(--text-muted)" }}>Winning Bidder: </span>
-                      <code style={{ fontSize: "0.75rem" }}>{selectedActionTender.winningBidder}</code>
+                return (
+                  <div key={t.id} className="my-tender-card">
+                    {/* Tender Header & Status Label */}
+                    <div className="my-tender-header">
+                      <div>
+                        <h4 className="my-tender-title">
+                          Tender #{t.id} {tenderTitle ? `— "${tenderTitle}"` : `(${t.documentHash ? t.documentHash.slice(0, 10) : ""})`}
+                        </h4>
+                        <div className="my-tender-status-row">
+                          <span className="my-tender-status-badge">
+                            {statusInfo.label}
+                          </span>
+                          {statusInfo.countdown && (
+                            <span className="my-tender-countdown highlight-timer">
+                              {statusInfo.countdown}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="my-tender-meta">
+                        <div>
+                          Max: <strong>{ethers.formatEther(t.ceilingPrice)} {CURRENCY_SYMBOL}</strong>
+                        </div>
+                        <div>
+                          Deposit: <strong>{ethers.formatEther(t.bidBond)} {CURRENCY_SYMBOL}</strong>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="field-status-box" style={{ marginBottom: "0.75rem" }}>
-                <span className="status-indicator-dot pending"></span>
-                <span>Please select a target tender above to evaluate lifecycle action availability.</span>
-              </div>
-            )}
 
-            <div className="lifecycle-actions-stack">
-              {/* Finalize Award */}
-              <div className="action-row">
-                <div className="action-row-content">
-                  <strong>Finalize Award</strong>
-                  <p className="field-hint">
-                    Evaluates lowest valid bid, assigns contractor, and forfeits unrevealed bonds to Department pull balance.
-                  </p>
-                  <div
-                    className={finalizeEligibility.allowed ? "field-validation-success" : "field-hint"}
-                    style={{ marginTop: "0.3rem", fontSize: "0.75rem" }}
-                  >
-                    {finalizeEligibility.allowed ? `✓ ${finalizeEligibility.reason}` : `ℹ️ ${finalizeEligibility.reason}`}
+                    {/* ONLY Next Valid Action & One-Line Description */}
+                    <div className="my-tender-action-box">
+                      <div className="action-description">
+                        {nextAction.description}
+                      </div>
+                      <button
+                        type="button"
+                        className={`btn btn-block ${nextAction.buttonClass || "btn-primary"}`}
+                        disabled={nextAction.disabled || isThisSubmitting || isWrongNetwork}
+                        onClick={nextAction.action || undefined}
+                      >
+                        {isThisSubmitting ? "Processing action..." : nextAction.buttonText}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-outline action-row-btn"
-                  onClick={handleFinalizeAward}
-                  disabled={isSubmitting || !finalizeEligibility.allowed}
-                >
-                  Finalize Award
-                </button>
-              </div>
-
-              {/* Fund Escrow */}
-              <div className="action-row">
-                <div className="action-row-content">
-                  <strong>Fund Contract Escrow</strong>
-                  <p className="field-hint">
-                    Transfers winning tender price from Department wallet into smart contract milestone escrow.
-                  </p>
-                  <div
-                    className={fundEscrowEligibility.allowed ? "field-validation-success" : "field-hint"}
-                    style={{ marginTop: "0.3rem", fontSize: "0.75rem" }}
-                  >
-                    {fundEscrowEligibility.allowed
-                      ? `✓ ${fundEscrowEligibility.reason}`
-                      : `ℹ️ ${fundEscrowEligibility.reason}`}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary action-row-btn"
-                  onClick={handleFundEscrow}
-                  disabled={isSubmitting || !fundEscrowEligibility.allowed}
-                >
-                  Fund Escrow
-                </button>
-              </div>
-
-              {/* Cancel Tender */}
-              <div className="action-row action-row-cancel">
-                <div className="cancel-action-header">
-                  <div className="action-row-content">
-                    <strong>Cancel Tender (Pre-Commit Deadline)</strong>
-                    <p className="field-hint">
-                      Cancels tender before sealed bid commit deadline. Unlocks all committed bid bonds for pull refund.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-warning action-row-btn"
-                    onClick={handleCancelTender}
-                    disabled={isSubmitting || !cancelEligibility.allowed}
-                  >
-                    Cancel Tender
-                  </button>
-                </div>
-                <div style={{ marginTop: "0.5rem" }}>
-                  <input
-                    type="text"
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    placeholder="Public reason for cancellation (required)"
-                    style={{ width: "100%", fontSize: "0.82rem" }}
-                  />
-                  <div
-                    className={cancelEligibility.allowed ? "field-validation-success" : "field-hint"}
-                    style={{ marginTop: "0.3rem", fontSize: "0.75rem" }}
-                  >
-                    {cancelEligibility.allowed ? `✓ ${cancelEligibility.reason}` : `ℹ️ ${cancelEligibility.reason}`}
-                  </div>
-                </div>
-              </div>
-
-              {/* Declare Default */}
-              <div className="action-row">
-                <div className="action-row-content">
-                  <strong>Declare Contractor Default</strong>
-                  <p className="field-hint">
-                    Enforces default if pending milestone passes due date + grace period. Performance bond forfeited, remaining escrow recovered.
-                  </p>
-                  <div
-                    className={defaultEligibility.allowed ? "field-validation-success" : "field-hint"}
-                    style={{ marginTop: "0.3rem", fontSize: "0.75rem" }}
-                  >
-                    {defaultEligibility.allowed ? `✓ ${defaultEligibility.reason}` : `ℹ️ ${defaultEligibility.reason}`}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-danger action-row-btn"
-                  onClick={handleDeclareDefault}
-                  disabled={isSubmitting || !defaultEligibility.allowed}
-                >
-                  Declare Default
-                </button>
-              </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* ================================================================= */}
-      {/* Verifier & Registrar Sections                                     */}
+      {/* Verifier & Registrar Sections (Preserved & Untouched)             */}
       {/* ================================================================= */}
-      <div className="officer-grid secondary-officer-grid">
+      <div className="officer-grid secondary-officer-grid" style={{ marginTop: "1.75rem" }}>
         {/* =============================================================== */}
         {/* Verifier Panel: Milestone Verification                          */}
         {/* =============================================================== */}
@@ -1106,7 +1226,7 @@ export default function OfficerTab({
           <div className="panel-header">
             <div>
               <h3>Milestone Verification</h3>
-              <p className="field-hint" style={{ marginTop: "0.2rem" }}>
+              <p className="panel-sub" style={{ marginTop: "0.2rem" }}>
                 Auditors and engineers verify delivered completion proofs to release milestone escrow.
               </p>
             </div>
@@ -1115,20 +1235,10 @@ export default function OfficerTab({
 
           <div className="form-card">
             {!isVerifierRole && (
-              <div className="portal-alert warning" style={{ marginBottom: "1rem" }}>
+              <div className="portal-alert alert-warning" style={{ marginBottom: "1rem" }}>
                 <span className="portal-alert-icon">⚠️</span>
-                <div>
-                  <strong>Verifier Role Required</strong>
-                  <p>
-                    {account ? (
-                      <>
-                        Connected wallet <code>{`${account.slice(0, 6)}...${account.slice(-4)}`}</code> does not hold{" "}
-                        <code>VERIFIER_ROLE</code>.
-                      </>
-                    ) : (
-                      <>No wallet connected. Milestone sign-offs require registered verifier credentials.</>
-                    )}
-                  </p>
+                <div className="portal-alert-body">
+                  <strong>Verifier Role Required:</strong> Milestone sign-offs require registered verifier credentials.
                 </div>
               </div>
             )}
@@ -1210,7 +1320,7 @@ export default function OfficerTab({
           <div className="panel-header">
             <div>
               <h3>Entity Registration &amp; Governance</h3>
-              <p className="field-hint" style={{ marginTop: "0.2rem" }}>
+              <p className="panel-sub" style={{ marginTop: "0.2rem" }}>
                 Manage role grants, anti-collusion bidding clusters, and regulatory debarments.
               </p>
             </div>
@@ -1219,20 +1329,10 @@ export default function OfficerTab({
 
           <div className="form-card registrar-controls">
             {!isRegistrarRole && (
-              <div className="portal-alert warning" style={{ marginBottom: "0.5rem" }}>
+              <div className="portal-alert alert-warning" style={{ marginBottom: "0.5rem" }}>
                 <span className="portal-alert-icon">⚠️</span>
-                <div>
-                  <strong>Registrar Authority Required</strong>
-                  <p>
-                    {account ? (
-                      <>
-                        Connected wallet <code>{`${account.slice(0, 6)}...${account.slice(-4)}`}</code> does not hold{" "}
-                        <code>REGISTRAR_ROLE</code> or <code>DEFAULT_ADMIN_ROLE</code>.
-                      </>
-                    ) : (
-                      <>No wallet connected. Role grants and debarments require registrar authority.</>
-                    )}
-                  </p>
+                <div className="portal-alert-body">
+                  <strong>Registrar Authority Required:</strong> Role grants and debarments require registrar authority.
                 </div>
               </div>
             )}
