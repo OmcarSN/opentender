@@ -62,14 +62,12 @@ export default function Header({
 
         {/* b) Navigation items: "How it works", "Tenders", "Bid", "Department & Verifiers" */}
         <nav className="vita-nav" role="tablist" aria-label="Main Navigation">
-          <button
-            role="tab"
-            aria-selected={activeTab === "home"}
-            className={`nav-link ${activeTab === "home" ? "active" : ""}`}
-            onClick={() => onTabChange("home")}
+          <a
+            href="/landing.html"
+            className="nav-link"
           >
             How it works
-          </button>
+          </a>
           <button
             role="tab"
             aria-selected={activeTab === "audit"}

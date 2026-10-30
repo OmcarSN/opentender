@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenTender — Sealed-bid public tenders on MST Blockchain</title>
+  <style>
+    @font-face {
+      font-family: 'Anton';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url('/landing/fonts/anton-latin.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Archivo';
+      font-style: normal;
+      font-weight: 400 600;
+      font-stretch: 100%;
+      font-display: swap;
+      src: url('/landing/fonts/archivo-latin.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url('/landing/fonts/jetbrains-mono-latin.woff2') format('woff2');
+    }
+
+    :root {
+      --u: 1px;
+      --edge-px: 500px;
+      --ground-px: 800px;
+      --ph: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      background: #fff;
+      color: #111;
+      font-family: 'Archivo', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* TRACK & NAV */
+    .track {
+      position: relative;
+      width: 100%;
+      background: #fff;
+    }
+
+    .nav {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: calc(80 * var(--u));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 calc(52 * var(--u));
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    .nav-brand {
+      font-family: 'Archivo', Arial, sans-serif;
+      font-weight: 600;
+      font-size: calc(30 * var(--u));
+      letter-spacing: -0.06em;
+      color: #111;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: calc(28 * var(--u));
+    }
+
+    .nav-item {
+      font-family: 'Archivo', Arial, sans-serif;
+      font-weight: 500;
+      font-size: calc(10 * var(--u));
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #111;
+      text-decoration: none;
+    }
+
+    .pill-btn {
+      font-family: 'Archivo', Arial, sans-serif;
+      font-weight: 500;
+      font-size: calc(10 * var(--u));
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-decoration: none;
+      border: 1px solid #111;
+      border-radius: 9999px;
+      padding: calc(8 * var(--u)) calc(18 * var(--u));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      color: #111;
+    }
+
+    /* SCENE */
+    .scene {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      height: 100lvh;
+      width: 100%;
+      overflow: hidden;
+      background: linear-gradient(#fff var(--ground-px), #111 var(--ground-px));
+    }
+
+    /* LAYER 1: STAGE */
+    .stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1920px;
+      height: 1080px;
+      transform-origin: 0 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .ground {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      bottom: 0;
+      background: #111;
+    }
+
+    .rig {
+      position: absolute;
+      left: 307px;
+      width: 960px;
+      height: 400px;
+      transform-origin: 480px 400px;
+    }
+
+    /* VAULT */
+    .vault-back {
+      position: absolute;
+      left: 0;
+      top: 100px;
+      width: 560px;
+      height: 300px;
+      background: #0e1d38;
+      z-index: 1;
+    }
+
+    .vault-lid {
+      position: absolute;
+      left: 0;
+      top: 40px;
+      width: 560px;
+      height: 60px;
+      background: #1d3a6b;
+      z-index: 2;
+      transform-origin: 0 60px;
+      will-change: transform;
+    }
+
+    .vault-front {
+      position: absolute;
+      left: 0;
+      top: 100px;
+      width: 560px;
+      height: 300px;
+      background: #14284b;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+    }
+
+    .vault-front svg {
+      width: 90px;
+      height: 90px;
+      stroke: #d6deeb;
+    }
+
+    .vault-text {
+      font-family: 'Archivo', Arial, sans-serif;
+      font-weight: 600;
+      font-size: 22px;
+      letter-spacing: 0.12em;
+      color: #d6deeb;
+    }
+
+    /* ENVELOPES */
+    .envelope {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 150px;
+      height: 100px;
+      background: #cfd8e6;
+      border: 3px solid #14284b;
+      border-radius: 4px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: 75px 50px;
+      will-change: transform, opacity;
+      overflow: hidden;
+    }
+
+    .env-sealed {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .env-label {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 13px;
+      color: #14284b;
+      font-weight: 500;
+    }
+
+    .env-revealed {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+    }
+
+    .env-amount {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: #14284b;
+      line-height: 1;
+    }
+
+    .env-curr {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: #14284b;
+      margin-top: 4px;
+    }
+
+    /* FAN LABELS */
+    .fan-label {
+      position: absolute;
+      left: 280px;
+      top: -230px;
+      transform: translateX(-50%);
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 13px;
+      color: #14284b;
+      font-weight: 500;
+      opacity: 0;
+      white-space: nowrap;
+      z-index: 5;
+    }
+
+    .winner-badge {
+      position: absolute;
+      left: 280px;
+      top: -200px;
+      transform: translateX(-50%);
+      background: #1fa39a;
+      color: #14284b;
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 4px;
+      opacity: 0;
+      white-space: nowrap;
+      z-index: 5;
+    }
+
+    /* BOARD */
+    .board {
+      position: absolute;
+      left: 640px;
+      top: 100px;
+      width: 320px;
+      height: 300px;
+      background: #d4dbe7;
+      border: 3px solid #14284b;
+      border-radius: 4px;
+      z-index: 3;
+      padding: 22px 28px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .board-title {
+      font-family: 'Archivo', Arial, sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      color: #14284b;
+      margin-bottom: 20px;
+    }
+
+    .board-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .board-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .row-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .row-name {
+      font-family: 'Archivo', Arial, sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      color: #14284b;
+    }
+
+    .row-tick {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1fa39a;
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      width: 260px;
+      height: 18px;
+      background: #b8c3d6;
+      border-radius: 9px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0px;
+      background: #1fa39a;
+      border-radius: 9px;
+    }
+
+    /* LAYER 2: GIANT LETTERS */
+    .giant-letters {
+      position: absolute;
+      bottom: calc(100% - var(--edge-px));
+      left: 0;
+      font-family: 'Anton', Impact, sans-serif;
+      font-size: calc(330 * var(--u));
+      line-height: 0.8;
+      color: #e9e9e9;
+      white-space: nowrap;
+      mix-blend-mode: darken;
+      pointer-events: none;
+      z-index: 20;
+      will-change: transform;
+    }
+
+    /* LAYER 3: PHASE READOUT & BADGE */
+    .phase-readout {
+      position: absolute;
+      top: calc(52 * var(--u));
+      left: calc(26 * var(--u));
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: calc(10.5 * var(--u));
+      color: #111;
+      font-weight: 500;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .network-badge {
+      position: absolute;
+      bottom: calc(20 * var(--u));
+      left: calc(26 * var(--u));
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: calc(10.5 * var(--u));
+      color: #9aa3b2;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    /* LAYER 4: BAND LAYER */
+    .band-layer {
+      position: absolute;
+      top: var(--edge-px);
+      bottom: 0;
+      left: 0;
+      right: 0;
+      overflow: hidden;
+      background: transparent;
+      z-index: 40;
+      pointer-events: auto;
+    }
+
+    .strip {
+      position: absolute;
+      top: calc(76 * var(--u));
+      left: 0;
+      display: flex;
+      flex-direction: row;
+      gap: calc(120 * var(--u));
+      white-space: nowrap;
+      will-change: transform;
+    }
+
+    .lead-block {
+      display: flex;
+      flex-direction: row;
+      gap: calc(64 * var(--u));
+      align-items: flex-start;
+      flex-shrink: 0;
+    }
+
+    .lead-headline {
+      font-family: 'Anton', Impact, sans-serif;
+      font-size: calc(64 * var(--u));
+      line-height: 0.98;
+      color: #fff;
+      white-space: normal;
+    }
+
+    .cobalt-text {
+      color: #2f63ff;
+    }
+
+    .lead-paragraphs {
+      width: calc(250 * var(--u));
+      display: flex;
+      flex-direction: column;
+      gap: calc(16 * var(--u));
+      white-space: normal;
+      font-family: 'Archivo', Arial, sans-serif;
+      font-size: calc(12 * var(--u));
+      line-height: 1.45;
+      color: rgba(255, 255, 255, 0.62);
+    }
+
+    /* CARDS */
+    .card {
+      width: calc(270 * var(--u));
+      padding: 0 calc(30 * var(--u));
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      white-space: normal;
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .lead-block + .card {
+      border-left: none;
+    }
+
+    .card-icon {
+      width: calc(38 * var(--u));
+      height: calc(38 * var(--u));
+      margin-bottom: calc(22 * var(--u));
+      stroke: #fff;
+      fill: none;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-family: 'Anton', Impact, sans-serif;
+      font-size: calc(26 * var(--u));
+      line-height: 1.05;
+      text-transform: uppercase;
+      margin-bottom: calc(14 * var(--u));
+    }
+
+    .card-body {
+      font-family: 'Archivo', Arial, sans-serif;
+      font-size: calc(12.4 * var(--u));
+      line-height: 1.4;
+    }
+
+    .bottom-pill {
+      position: absolute;
+      bottom: calc(36 * var(--u));
+      left: 50%;
+      transform: translateX(-50%) translateY(24px);
+      border: 1px solid #fff;
+      color: #fff;
+      opacity: 0;
+      will-change: transform, opacity;
+      pointer-events: auto;
+    }
+
+    /* PHONES & NARROW PORTRAIT */
+    @media (max-width: 767px), (orientation: portrait) {
+      .nav {
+        top: 40px;
+        height: calc(50 * var(--u));
+        padding: 0 20px;
+      }
+      .nav-brand {
+        font-size: calc(24 * var(--u));
+      }
+      .nav-git {
+        display: none !important;
+      }
+      .phase-readout {
+        font-size: 11px !important;
+        left: 20px !important;
+        top: 22px !important;
+      }
+      .network-badge {
+        font-size: 10px !important;
+        left: 20px !important;
+        bottom: 16px !important;
+      }
+      .giant-letters {
+        font-size: calc(180 * var(--u));
+      }
+      .strip {
+        top: calc(44 * var(--u));
+        gap: calc(56 * var(--u));
+        padding-left: 22px;
+      }
+      .lead-block {
+        flex-direction: column;
+        gap: calc(20 * var(--u));
+      }
+      .lead-headline {
+        font-size: calc(46 * var(--u));
+      }
+      .lead-paragraphs {
+        width: calc(300 * var(--u));
+        font-size: calc(13 * var(--u));
+      }
+      .card {
+        width: calc(250 * var(--u));
+      }
+      .card-title {
+        font-size: calc(26 * var(--u));
+      }
+      .card-body {
+        font-size: calc(13 * var(--u));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="track" id="track">
+    <nav class="nav">
+      <a href="/" class="nav-brand">OpenTender</a>
+      <div class="nav-links">
+        <a href="https://github.com/OmcarSN/opentender" target="_blank" rel="noopener noreferrer" class="nav-item nav-git">→ GitHub</a>
+        <a href="https://testnet.mstscan.com/address/0x493Bb88ad309346aA84E237aC84c8612eD1852d8" target="_blank" rel="noopener noreferrer" class="nav-item">→ Contract</a>
+        <a href="/?tab=audit" class="pill-btn">Open the app</a>
+      </div>
+    </nav>
+
+    <div class="scene" id="scene">
+      <!-- Layer 1: The Stage -->
+      <div class="stage" id="stage">
+        <div class="ground" id="ground"></div>
+        <div class="rig" id="rig">
+          <!-- Fan Labels -->
+          <div class="fan-label" id="fanLabel">EXAMPLE VALUES, NOT REAL BIDS</div>
+          <div class="winner-badge" id="winnerBadge">LOWEST VALID BID: AUTOMATIC WINNER</div>
+
+          <!-- Vault Back -->
+          <div class="vault-back"></div>
+
+          <!-- Vault Lid -->
+          <div class="vault-lid" id="vaultLid"></div>
+
+          <!-- Envelopes -->
+          <div class="envelope" id="envA">
+            <div class="env-sealed" id="sealedA">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#14284b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+              </svg>
+              <div class="env-label">BID A</div>
+            </div>
+            <div class="env-revealed" id="revealedA">
+              <div class="env-amount">0.018</div>
+              <div class="env-curr">tMSTC</div>
+            </div>
+          </div>
+
+          <div class="envelope" id="envB">
+            <div class="env-sealed" id="sealedB">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#14284b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+              </svg>
+              <div class="env-label">BID B</div>
+            </div>
+            <div class="env-revealed" id="revealedB">
+              <div class="env-amount">0.015</div>
+              <div class="env-curr">tMSTC</div>
+            </div>
+          </div>
+
+          <div class="envelope" id="envC">
+            <div class="env-sealed" id="sealedC">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#14284b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+              </svg>
+              <div class="env-label">BID C</div>
+            </div>
+            <div class="env-revealed" id="revealedC">
+              <div class="env-amount">0.019</div>
+              <div class="env-curr">tMSTC</div>
+            </div>
+          </div>
+
+          <!-- Vault Front -->
+          <div class="vault-front">
+            <svg viewBox="0 0 90 90" fill="none" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="22" y="38" width="46" height="38" rx="6"></rect>
+              <path d="M31 38V27a14 14 0 0 1 28 0v11"></path>
+              <circle cx="45" cy="54" r="4" fill="#d6deeb"></circle>
+              <path d="M45 58v7"></path>
+            </svg>
+            <div class="vault-text">SMART CONTRACT</div>
+          </div>
+
+          <!-- Board -->
+          <div class="board">
+            <div class="board-title">PAYMENT STAGES</div>
+            <div class="board-rows">
+              <div class="board-row">
+                <div class="row-meta">
+                  <span class="row-name">STAGE 1 · 30%</span>
+                  <span class="row-tick" id="tick1">✓ 2 OF 2 VERIFIERS</span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill" id="fill1"></div>
+                </div>
+              </div>
+              <div class="board-row">
+                <div class="row-meta">
+                  <span class="row-name">STAGE 2 · 30%</span>
+                  <span class="row-tick" id="tick2">✓ 2 OF 2 VERIFIERS</span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill" id="fill2"></div>
+                </div>
+              </div>
+              <div class="board-row">
+                <div class="row-meta">
+                  <span class="row-name">STAGE 3 · 40%</span>
+                  <span class="row-tick" id="tick3">✓ 2 OF 2 VERIFIERS</span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill" id="fill3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layer 2: Giant Letters -->
+      <div class="giant-letters" id="giantLetters">HOW IT WORKS</div>
+
+      <!-- Layer 3: Phase Readout & Network Badge -->
+      <div class="phase-readout" id="phaseReadout">01 SEALED BIDS</div>
+      <div class="network-badge">Prototype on MST Testnet. Test tokens only.</div>
+
+      <!-- Layer 4: Band Layer -->
+      <div class="band-layer" id="bandLayer">
+        <div class="strip" id="strip">
+          <div class="lead-block">
+            <div class="lead-headline">
+              <div>EVERYTHING A TENDER NEEDS.</div>
+              <div>ENFORCED BY CODE.</div>
+              <div class="cobalt-text">ON ONE CONTRACT.</div>
+            </div>
+            <div class="lead-paragraphs">
+              <p>From sealed bids to the final payment, every rule is enforced by one smart contract on MST Blockchain.</p>
+              <p>It cannot stop companies agreeing prices privately, and it relies on an honest registrar and verifiers. It is a prototype on a test network.</p>
+            </div>
+          </div>
+
+          <!-- Card 1 -->
+          <div class="card">
+            <svg class="card-icon" viewBox="0 0 38 38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="7" width="32" height="24" rx="3"></rect>
+              <polyline points="3 10 19 21 35 10"></polyline>
+              <rect x="14" y="19" width="10" height="9" rx="1.5" fill="#111"></rect>
+              <path d="M16 19v-2a3 3 0 0 1 6 0v2"></path>
+            </svg>
+            <div class="card-title">SEALED<br>BIDS</div>
+            <div class="card-body">Companies lock their price in a sealed bid with a deposit. It cannot be read early or edited after submission.</div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="card">
+            <svg class="card-icon" viewBox="0 0 38 38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="14" cy="19" r="10"></circle>
+              <circle cx="24" cy="19" r="10"></circle>
+            </svg>
+            <div class="card-title">ANTI-COLLUSION<br>GROUPS</div>
+            <div class="card-body">Companies registered in the same group cannot bid against each other on the same tender.</div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="card">
+            <svg class="card-icon" viewBox="0 0 38 38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 7h20v9a10 10 0 0 1-20 0V7z"></path>
+              <path d="M5 9h4v5a4 4 0 0 1-4-4V9z"></path>
+              <path d="M33 9h-4v5a4 4 0 0 0 4-4V9z"></path>
+              <path d="M19 26v6"></path>
+              <path d="M13 32h12"></path>
+            </svg>
+            <div class="card-title">AUTOMATIC<br>WINNER</div>
+            <div class="card-body">After the opening, the lowest valid bid wins by rule. Ties go to the earliest sealed bid. No one picks the winner.</div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="card">
+            <svg class="card-icon" viewBox="0 0 38 38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="6" y1="10" x2="20" y2="10"></line>
+              <line x1="6" y1="19" x2="18" y2="19"></line>
+              <line x1="6" y1="28" x2="16" y2="28"></line>
+              <polyline points="22 23 26 27 34 17"></polyline>
+            </svg>
+            <div class="card-title">STAGED<br>PAYMENTS</div>
+            <div class="card-body">The department locks the winning amount first. Each stage is paid when enough verifiers approve it. Late work is penalised automatically.</div>
+          </div>
+
+          <!-- Card 5 -->
+          <div class="card">
+            <svg class="card-icon" viewBox="0 0 38 38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 5a2 2 0 0 1 2-2h14l8 8v20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5z"></path>
+              <polyline points="22 3 22 11 30 11"></polyline>
+              <circle cx="16" cy="21" r="5"></circle>
+              <line x1="20" y1="25" x2="25" y2="30"></line>
+            </svg>
+            <div class="card-title">PUBLIC<br>AUDIT TRAIL</div>
+            <div class="card-body">Every bid, award and payment is recorded on MST Testnet and can be checked by anyone in the explorer.</div>
+          </div>
+        </div>
+
+        <a href="/?tab=audit" class="pill-btn bottom-pill" id="bottomPill">Open the app</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // Helpers
+      function clamp(val, min, max) {
+        return Math.min(Math.max(val, min), max);
+      }
+      function seg(q, a, b) {
+        return clamp((q - a) / (b - a), 0, 1);
+      }
+      function ease(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      // Elements
+      const track = document.getElementById('track');
+      const stage = document.getElementById('stage');
+      const ground = document.getElementById('ground');
+      const rig = document.getElementById('rig');
+      const vaultLid = document.getElementById('vaultLid');
+      const envA = document.getElementById('envA');
+      const envB = document.getElementById('envB');
+      const envC = document.getElementById('envC');
+      const sealedA = document.getElementById('sealedA');
+      const sealedB = document.getElementById('sealedB');
+      const sealedC = document.getElementById('sealedC');
+      const revealedA = document.getElementById('revealedA');
+      const revealedB = document.getElementById('revealedB');
+      const revealedC = document.getElementById('revealedC');
+      const fanLabel = document.getElementById('fanLabel');
+      const winnerBadge = document.getElementById('winnerBadge');
+      const tick1 = document.getElementById('tick1');
+      const tick2 = document.getElementById('tick2');
+      const tick3 = document.getElementById('tick3');
+      const fill1 = document.getElementById('fill1');
+      const fill2 = document.getElementById('fill2');
+      const fill3 = document.getElementById('fill3');
+      const giantLetters = document.getElementById('giantLetters');
+      const phaseReadout = document.getElementById('phaseReadout');
+      const strip = document.getElementById('strip');
+      const bottomPill = document.getElementById('bottomPill');
+      const cards = Array.from(document.querySelectorAll('.card'));
+
+      // Layout state
+      const A = 2.4;
+      let B = 1.5;
+      let vw = window.innerWidth;
+      let vh = window.innerHeight;
+      let scale = 1;
+      let stageTop = 0;
+      let stripWidth = 1000;
+      let lettersWidth = 1000;
+
+      // URL parameters for testing / direct inspection
+      const urlParams = new URLSearchParams(window.location.search);
+      let forcedQ = null;
+      let forcedR = null;
+
+      if (urlParams.has('p')) {
+        forcedQ = parseFloat(urlParams.get('p'));
+      } else if (urlParams.has('r')) {
+        forcedR = parseFloat(urlParams.get('r'));
+      } else if (urlParams.has('scrollY')) {
+        const sy = parseFloat(urlParams.get('scrollY'));
+        forcedQ = sy / (A * (window.innerHeight || 960));
+      }
+
+      let curQ = forcedQ !== null ? forcedQ : 0;
+      let lastRenderedQ = -1;
+      let lastScrollY = -1;
+
+      function updateLayout() {
+        vw = document.documentElement.clientWidth || window.innerWidth;
+        vh = document.documentElement.clientHeight || window.innerHeight;
+        const isMobile = vw < 768 || vw <= vh;
+        const u = isMobile ? Math.min(vw / 430, 1.4) : Math.min(vw / 1440, vh / 960);
+        document.documentElement.style.setProperty('--u', u + 'px');
+
+        if (!isMobile) {
+          scale = Math.max(vw / 1920, vh / 1080);
+          const left = (vw - 1920 * scale) / 2;
+          stageTop = (vh - 1080 * scale) / 2;
+          stage.style.transform = 'translate(' + left + 'px, ' + stageTop + 'px) scale(' + scale + ')';
+        } else {
+          scale = 1.55 * vw / 1920;
+          const left = vw / 2 - 0.40 * 1920 * scale;
+          stageTop = 0.36 * vh - 0.448 * 1080 * scale;
+          stage.style.transform = 'translate(' + left + 'px, ' + stageTop + 'px) scale(' + scale + ')';
+        }
+
+        const edgePx = stageTop + 0.448 * 1080 * scale;
+        document.documentElement.style.setProperty('--edge-px', edgePx + 'px');
+
+        stripWidth = strip.scrollWidth || strip.offsetWidth;
+        lettersWidth = giantLetters.scrollWidth || giantLetters.offsetWidth;
+        B = (stripWidth + 0.45 * vw) / vw * 1.1;
+
+        track.style.height = (1 + A + B) * vh + 'px';
+
+        let initScrollY = 0;
+        if (forcedQ !== null) {
+          initScrollY = forcedQ * A * vh;
+          if (forcedQ > 0.05) {
+            document.querySelector('.nav').style.display = 'none';
+          } else {
+            document.querySelector('.nav').style.display = 'flex';
+          }
+        } else if (forcedR !== null) {
+          initScrollY = A * vh + forcedR * B * vh;
+          document.querySelector('.nav').style.display = 'none';
+        } else {
+          initScrollY = window.scrollY || window.pageYOffset || 0;
+        }
+
+        lastRenderedQ = -1;
+        render(curQ, initScrollY);
+      }
+
+      window.addEventListener('resize', updateLayout);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updateLayout);
+      }
+      updateLayout();
+
+      function frame() {
+        let scrollY = window.scrollY || window.pageYOffset || 0;
+        if (forcedQ !== null) {
+          scrollY = forcedQ * A * vh;
+          curQ = forcedQ;
+        } else if (forcedR !== null) {
+          scrollY = A * vh + forcedR * B * vh;
+          curQ = 1.0;
+        } else {
+          const targetQ = clamp(scrollY / (A * vh), 0, 1);
+          curQ += (targetQ - curQ) * 0.2;
+          if (Math.abs(targetQ - curQ) < 0.0001) {
+            curQ = targetQ;
+          }
+        }
+
+        const shouldRender = Math.abs(curQ - lastRenderedQ) > 0.00005 || scrollY !== lastScrollY;
+
+        if (shouldRender) {
+          render(curQ, scrollY);
+          lastRenderedQ = curQ;
+          lastScrollY = scrollY;
+        }
+
+        requestAnimationFrame(frame);
+      }
+
+      function render(q, scrollY) {
+        // Ground & Camera pull-back
+        const tCam = ease(seg(q, 0.77, 0.93));
+        const G = lerp(895, 484, tCam);
+        const sc = lerp(1.45, 1.0, tCam);
+
+        const groundPx = stageTop + G * scale;
+        document.documentElement.style.setProperty('--ground-px', groundPx + 'px');
+        ground.style.top = G + 'px';
+        ground.style.height = (1080 - G) + 'px';
+
+        rig.style.top = (G - 400) + 'px';
+        rig.style.transform = 'scale(' + sc + ')';
+
+        // Lid state
+        let lidOpen = 1.0;
+        if (q < 0.20) {
+          lidOpen = 1.0;
+        } else if (q < 0.28) {
+          lidOpen = 1.0 - ease(seg(q, 0.20, 0.28));
+        } else if (q < 0.34) {
+          lidOpen = 0.0;
+        } else if (q < 0.44) {
+          lidOpen = ease(seg(q, 0.34, 0.44));
+        } else if (q < 0.75) {
+          lidOpen = 1.0;
+        } else if (q < 0.77) {
+          lidOpen = 1.0 - ease(seg(q, 0.75, 0.77));
+        } else {
+          lidOpen = 0.0;
+        }
+
+        vaultLid.style.transform = 'translateY(' + (-110 * lidOpen) + 'px) rotate(' + (-8 * lidOpen) + 'deg)';
+
+        // Envelopes A, B, C positions
+        let xA = 60, yA = -700, rotA = 0;
+        let xB = 205, yB = -820, rotB = 0, scaleB = 1.0;
+        let xC = 350, yC = -760, rotC = 0;
+
+        // p1: Drops
+        const tDropA = ease(seg(q, 0.00, 0.12));
+        const tDropB = ease(seg(q, 0.04, 0.16));
+        const tDropC = ease(seg(q, 0.08, 0.20));
+
+        yA = lerp(-700, 130, tDropA);
+        yB = lerp(-820, 130, tDropB);
+        yC = lerp(-760, 130, tDropC);
+
+        // p3: Bids rise to fan
+        if (q >= 0.34) {
+          const tRise = ease(seg(q, 0.34, 0.44));
+          xA = lerp(60, 20, tRise);
+          yA = lerp(130, -110, tRise);
+          rotA = lerp(0, -8, tRise);
+
+          xB = 205;
+          yB = lerp(130, -150, tRise);
+          rotB = 0;
+
+          xC = lerp(350, 390, tRise);
+          yC = lerp(130, -110, tRise);
+          rotC = lerp(0, 8, tRise);
+        }
+
+        // p6: Winner moves
+        if (q >= 0.60) {
+          const tMove = ease(seg(q, 0.60, 0.66));
+          xB = lerp(205, 700, tMove);
+          yB = lerp(-150, 60, tMove);
+          scaleB = lerp(1.0, 0.5, tMove);
+        }
+
+        // Envelopes opacity & styling
+        let opA = 1.0;
+        let opB = q >= 0.66 ? 0.0 : 1.0;
+        let opC = 1.0;
+
+        if (q >= 0.52 && q < 0.60) {
+          const tHl = seg(q, 0.52, 0.60);
+          opA = lerp(1.0, 0.35, tHl);
+          opC = lerp(1.0, 0.35, tHl);
+          envB.style.border = lerp(3, 4, tHl) + 'px solid #1fa39a';
+          winnerBadge.style.opacity = tHl;
+        } else if (q >= 0.60 && q < 0.66) {
+          const tFade = seg(q, 0.60, 0.66);
+          opA = lerp(0.35, 0.0, tFade);
+          opC = lerp(0.35, 0.0, tFade);
+          envB.style.border = '4px solid #1fa39a';
+          winnerBadge.style.opacity = lerp(1.0, 0.0, tFade);
+        } else if (q >= 0.66) {
+          opA = 0.0;
+          opC = 0.0;
+          winnerBadge.style.opacity = 0;
+        } else {
+          envB.style.border = '3px solid #14284b';
+          winnerBadge.style.opacity = 0;
+        }
+
+        envA.style.opacity = opA;
+        envB.style.opacity = opB;
+        envC.style.opacity = opC;
+
+        envA.style.transform = 'translate(' + xA + 'px, ' + yA + 'px) rotate(' + rotA + 'deg)';
+        envB.style.transform = 'translate(' + xB + 'px, ' + yB + 'px) rotate(' + rotB + 'deg) scale(' + scaleB + ')';
+        envC.style.transform = 'translate(' + xC + 'px, ' + yC + 'px) rotate(' + rotC + 'deg)';
+
+        // p4: Bids open
+        let openAmount = 0.0;
+        if (q >= 0.44 && q < 0.52) {
+          openAmount = seg(q, 0.44, 0.52);
+        } else if (q >= 0.52) {
+          openAmount = 1.0;
+        }
+
+        sealedA.style.opacity = 1 - openAmount;
+        sealedB.style.opacity = 1 - openAmount;
+        sealedC.style.opacity = 1 - openAmount;
+
+        revealedA.style.opacity = openAmount;
+        revealedB.style.opacity = openAmount;
+        revealedC.style.opacity = openAmount;
+
+        if (q >= 0.44 && q < 0.60) {
+          fanLabel.style.opacity = seg(q, 0.44, 0.52);
+        } else if (q >= 0.60 && q < 0.66) {
+          fanLabel.style.opacity = lerp(1.0, 0.0, seg(q, 0.60, 0.66));
+        } else {
+          fanLabel.style.opacity = 0;
+        }
+
+        // p6b: Payment board stages
+        const r1 = seg(q, 0.66, 0.69);
+        const r2 = seg(q, 0.69, 0.72);
+        const r3 = seg(q, 0.72, 0.75);
+
+        fill1.style.width = (260 * r1) + 'px';
+        fill2.style.width = (260 * r2) + 'px';
+        fill3.style.width = (260 * r3) + 'px';
+
+        tick1.style.opacity = r1 >= 1 ? 1 : 0;
+        tick2.style.opacity = r2 >= 1 ? 1 : 0;
+        tick3.style.opacity = r3 >= 1 ? 1 : 0;
+
+        // Phase Readout
+        if (q < 0.34) {
+          phaseReadout.textContent = "01 SEALED BIDS";
+        } else if (q < 0.52) {
+          phaseReadout.textContent = "02 BIDS OPENED";
+        } else if (q < 0.66) {
+          phaseReadout.textContent = "03 AUTOMATIC WINNER";
+        } else {
+          phaseReadout.textContent = "04 PAID IN STAGES";
+        }
+
+        // Settled pill & --ph
+        const isSettled = q >= 0.94;
+        document.documentElement.style.setProperty('--ph', isSettled ? '1' : '0');
+        const pillProg = ease(seg(q, 0.94, 1.0));
+        bottomPill.style.opacity = pillProg;
+        bottomPill.style.transform = 'translateX(-50%) translateY(' + ((1 - pillProg) * 24) + 'px)';
+
+        // Horizontal strip & giant letters scroll
+        const r = clamp((scrollY - A * vh) / (B * vh), 0, 1);
+        const stripX = vw - r * (stripWidth + 0.45 * vw);
+        const lettersX = vw - r * (lettersWidth + vw);
+
+        strip.style.transform = 'translateX(' + stripX + 'px)';
+        giantLetters.style.transform = 'translateX(' + lettersX + 'px)';
+
+        // Card reveals
+        cards.forEach(function (card) {
+          const rect = card.getBoundingClientRect();
+          const s = clamp((0.98 - rect.left / vw) / 0.3, -0.4, 1.6) * 100;
+          const stop1 = Math.round(s - 34);
+          const stop2 = Math.round(s - 6);
+          const stop3 = Math.round(s + 26);
+          const grad = 'linear-gradient(90deg, #fff ' + stop1 + '%, #2f63ff ' + stop2 + '%, transparent ' + stop3 + '%)';
+
+          const title = card.querySelector('.card-title');
+          const body = card.querySelector('.card-body');
+          if (title) {
+            title.style.backgroundImage = grad;
+            title.style.webkitBackgroundClip = 'text';
+            title.style.backgroundClip = 'text';
+            title.style.webkitTextFillColor = 'transparent';
+            title.style.color = 'transparent';
+          }
+          if (body) {
+            body.style.backgroundImage = grad;
+            body.style.webkitBackgroundClip = 'text';
+            body.style.backgroundClip = 'text';
+            body.style.webkitTextFillColor = 'transparent';
+            body.style.color = 'transparent';
+          }
+        });
+      }
+
+      // Initial synchronous render
+      render(curQ, window.scrollY || 0);
+
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
