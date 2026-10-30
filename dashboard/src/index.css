@@ -3974,3 +3974,232 @@ input[type="file"]::file-selector-button:hover {
 .btn-modal-close:hover {
   background: rgba(255, 255, 255, 0.15);
 }
+
+/* =========================================================================
+   Guided Bidder Page Styles (Step 1 - Step 7)
+   ========================================================================= */
+.bid-page-header {
+  margin-bottom: 1.5rem;
+}
+
+.bid-page-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 0.4rem 0;
+}
+
+.bid-page-subline {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.empty-tender-notice {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
+.tender-stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.tender-stat-chip {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.5rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 140px;
+}
+
+.tender-stat-chip .stat-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.tender-stat-chip .stat-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fafc;
+  font-family: var(--font-mono);
+}
+
+.tender-stat-chip .highlight-timer {
+  color: var(--emerald-light);
+}
+
+.deposit-callout-box {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 3px solid var(--emerald);
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  line-height: 1.45;
+  margin-top: -0.25rem;
+}
+
+.advanced-salt-details {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 0.25rem 0;
+}
+
+.advanced-salt-summary {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  list-style: none;
+}
+
+.advanced-salt-summary::-webkit-details-marker {
+  display: none;
+}
+
+.details-chevron {
+  transition: transform 0.2s ease;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+details[open] .details-chevron {
+  transform: rotate(180deg);
+}
+
+.advanced-salt-content {
+  padding: 0.75rem 0.85rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.action-button-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.btn-disabled-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  line-height: 1.4;
+}
+
+.reason-bullet {
+  font-size: 0.85rem;
+}
+
+.backup-import-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.backup-import-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.backup-label {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.btn-file-upload {
+  display: inline-block;
+  padding: 0.45rem 0.95rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+
+.btn-file-upload:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.milestone-auto-tag {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: var(--emerald-light);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 6px;
+}
+
+.money-section-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.money-subheading {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+
+.refundable-tenders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.refundable-tender-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.refundable-info {
+  font-size: 0.88rem;
+  color: #f1f5f9;
+}
