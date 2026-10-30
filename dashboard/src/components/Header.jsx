@@ -11,13 +11,10 @@ export default function Header({
   onConnect,
   onDisconnect,
   onSwitchNetwork,
-  searchQuery,
-  onSearchChange,
-  activeWalletName
+  isRpcOnline = true,
 }) {
-  const isCorrectNetwork = chainId === CHAIN_ID;
+  const isWrongNetwork = Boolean(account && chainId && chainId !== CHAIN_ID);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
-  const [copied, setCopied] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -34,211 +31,142 @@ export default function Header({
     };
   }, [showAccountMenu]);
 
+  // Plain words role label from existing role detection: Admin, Department, Verifier, Bidder, or "Visitor (no role)"
+  const getRoleLabel = () => {
+    if (!roles) return "Visitor (no role)";
+    if (roles.isRegistrar) return "Admin";
+    if (roles.isDepartment) return "Department";
+    if (roles.isVerifier) return "Verifier";
+    if (roles.isBidder && !roles.isDebarred) return "Bidder";
+    return "Visitor (no role)";
+  };
+
+  const roleLabel = getRoleLabel();
+
   return (
-    <header className="vita-header">
-      {/* Brand Logo with star icon */}
-      <div className="vita-brand" onClick={() => onTabChange("audit")}>
-        <span className="brand-symbol">✻</span>
-        <span className="brand-name">OpenTender</span>
-      </div>
-
-      {/* Global Search Pill */}
-      <div className="vita-search-pill">
-        <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input
-          type="text"
-          placeholder="Search tenders, departments, categories..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </div>
-
-      {/* Navigation Links */}
-      <nav className="vita-nav" role="tablist" aria-label="Main Navigation">
-        <button
-          role="tab"
-          aria-selected={activeTab === "audit"}
-          className={`nav-link ${activeTab === "audit" ? "active" : ""}`}
-          onClick={() => onTabChange("audit")}
-        >
-          Public Audit
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === "bidder"}
-          className={`nav-link ${activeTab === "bidder" ? "active" : ""}`}
-          onClick={() => onTabChange("bidder")}
-        >
-          Bidder Portal
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === "officer"}
-          className={`nav-link ${activeTab === "officer" ? "active" : ""}`}
-          onClick={() => onTabChange("officer")}
-        >
-          Officer &amp; Verifiers
-        </button>
-      </nav>
-
-      {/* Right Actions: Network & Wallet */}
-      <div className="vita-actions">
-        {/* Network indicator */}
+    <>
+      <header className="vita-header">
+        {/* a) Logo text "OpenTender" */}
         <div
-          className={`vita-network-badge ${!isCorrectNetwork ? "is-wrong-network" : ""}`}
-          title={
-            isCorrectNetwork
-              ? `Connected to ${CHAIN_NAME} (Chain ID: ${CHAIN_ID})`
-              : `Wrong network. Click Switch to connect to ${CHAIN_NAME} (Chain ID: ${CHAIN_ID})`
-          }
+          className="vita-brand"
+          onClick={() => onTabChange("audit")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") onTabChange("audit");
+          }}
+          aria-label="OpenTender Home"
         >
-          <span className={`network-dot ${isCorrectNetwork ? "online" : "warning"}`} />
-          <span className="network-name">
-            {isCorrectNetwork ? CHAIN_NAME : `Switch to ${CHAIN_NAME}`}
-          </span>
-          {!isCorrectNetwork && (
-            <button
-              className="btn-switch-mini"
-              onClick={onSwitchNetwork}
-              title={`Switch network to ${CHAIN_NAME}`}
-              aria-label={`Switch network to ${CHAIN_NAME}`}
-            >
-              Switch
-            </button>
-          )}
+          <span className="brand-name">OpenTender</span>
         </div>
 
-        {/* Roles Badges */}
-        {account && (
-          <div className="vita-role-badges">
-            {roles.isRegistrar && <span className="vita-pill pill-purple">Registrar</span>}
-            {roles.isDepartment && <span className="vita-pill pill-blue">Department</span>}
-            {roles.isVerifier && <span className="vita-pill pill-cyan">Verifier</span>}
-            {roles.isBidder && !roles.isDebarred && (
-              <span className="vita-pill pill-emerald">Registered Bidder</span>
-            )}
-            {roles.isDebarred && <span className="vita-pill pill-red">Debarred</span>}
-            {!roles.isRegistrar && !roles.isDepartment && !roles.isVerifier && !roles.isBidder && (
-              <span className="vita-pill pill-gray">Public Wallet</span>
-            )}
+        {/* b) Navigation with exactly three items: "Tenders", "Bid", "Department & Verifiers" */}
+        <nav className="vita-nav" role="tablist" aria-label="Main Navigation">
+          <button
+            role="tab"
+            aria-selected={activeTab === "audit"}
+            className={`nav-link ${activeTab === "audit" ? "active" : ""}`}
+            onClick={() => onTabChange("audit")}
+          >
+            Tenders
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === "bidder"}
+            className={`nav-link ${activeTab === "bidder" ? "active" : ""}`}
+            onClick={() => onTabChange("bidder")}
+          >
+            Bid
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === "officer"}
+            className={`nav-link ${activeTab === "officer" ? "active" : ""}`}
+            onClick={() => onTabChange("officer")}
+          >
+            Department &amp; Verifiers
+          </button>
+        </nav>
+
+        {/* c) On the right: small network chip and wallet button */}
+        <div className="vita-actions">
+          {/* Network chip: VITE_CHAIN_NAME with green dot (RPC online) or red dot (RPC offline). No warning if no wallet */}
+          <div
+            className="vita-network-chip"
+            title={isRpcOnline ? `${CHAIN_NAME} (RPC Online)` : `${CHAIN_NAME} (RPC Offline)`}
+          >
+            <span className={`network-dot ${isRpcOnline ? "online" : "offline"}`} />
+            <span className="network-name">{CHAIN_NAME}</span>
           </div>
-        )}
 
-        {/* Wallet Connect / Connected Group */}
-        {account ? (
-          <div className="vita-wallet-connected-group">
+          {/* Wallet button */}
+          {account ? (
             <div className="vita-wallet-wrapper" ref={menuRef}>
-              <button
-                className={`vita-wallet-pill ${showAccountMenu ? "active" : ""}`}
-                onClick={() => setShowAccountMenu(!showAccountMenu)}
-                title="Click for account details & copy address"
-                aria-label="Account details"
-              >
-                <span className="wallet-dot-connected" />
-                <span className="wallet-amt">
-                  {parseFloat(balance || "0").toFixed(3)} {CURRENCY_SYMBOL}
+              <div className="vita-wallet-pill-group">
+                <span className="wallet-role-badge">{roleLabel}</span>
+                <span className="wallet-balance-amt font-mono">
+                  {parseFloat(balance || "0").toFixed(4)} {CURRENCY_SYMBOL}
                 </span>
-                <span className="wallet-addr font-mono">
-                  {account.slice(0, 6)}...{account.slice(-4)}
-                </span>
-                <span className="wallet-dropdown-caret">{showAccountMenu ? "▴" : "▾"}</span>
-              </button>
+                <button
+                  type="button"
+                  className={`wallet-address-btn ${showAccountMenu ? "active" : ""}`}
+                  onClick={() => setShowAccountMenu((prev) => !prev)}
+                  aria-expanded={showAccountMenu}
+                  aria-haspopup="true"
+                  title="Click to open disconnect menu"
+                >
+                  <span className="font-mono">{account.slice(0, 6)}...{account.slice(-4)}</span>
+                  <span className="dropdown-caret">{showAccountMenu ? "▴" : "▾"}</span>
+                </button>
+              </div>
 
-              {/* Account Details & Disconnect Menu */}
+              {/* Disconnect inside a small dropdown opened by clicking the address */}
               {showAccountMenu && (
                 <div className="account-dropdown-menu">
-                  <div className="dropdown-account-header">
-                    <div className="dropdown-wallet-title">
-                      <span className="dropdown-indicator online" />
-                      <span className="dropdown-wallet-name">{activeWalletName || "Connected Wallet"}</span>
-                    </div>
-                    <span className={`dropdown-network-name ${!isCorrectNetwork ? "warning" : ""}`}>
-                      {isCorrectNetwork ? CHAIN_NAME : `Expected: ${CHAIN_NAME}`}
+                  <div className="account-dropdown-info">
+                    <span className="dropdown-addr-label">Address:</span>
+                    <span className="dropdown-addr-val font-mono">
+                      {account.slice(0, 6)}...{account.slice(-4)}
                     </span>
                   </div>
-
-                  {!isCorrectNetwork && (
-                    <button
-                      className="dropdown-switch-network-action"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onSwitchNetwork) onSwitchNetwork();
-                      }}
-                      title={`Switch to ${CHAIN_NAME}`}
-                    >
-                      <span className="network-dot warning" />
-                      <span>Switch to {CHAIN_NAME}</span>
-                    </button>
-                  )}
-
-                  <div className="dropdown-address-box">
-                    <span className="dropdown-address-text font-mono">
-                      {account.slice(0, 10)}...{account.slice(-8)}
-                    </span>
-                    <button
-                      className="dropdown-copy-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (navigator.clipboard) {
-                          navigator.clipboard.writeText(account);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                        }
-                      }}
-                    >
-                      {copied ? "✓ Copied" : "Copy"}
-                    </button>
-                  </div>
-
-                  <div className="dropdown-balance-row">
-                    <span className="dropdown-label">Balance</span>
-                    <span className="dropdown-val font-mono">
-                      {parseFloat(balance || "0").toFixed(4)} {CURRENCY_SYMBOL}
-                    </span>
-                  </div>
-
-                  <div className="dropdown-divider" />
-
                   <button
+                    type="button"
                     className="dropdown-disconnect-btn"
                     onClick={() => {
                       setShowAccountMenu(false);
-                      if (onDisconnect) onDisconnect();
+                      onDisconnect();
                     }}
                   >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
-                      <line x1="12" y1="2" x2="12" y2="12" />
-                    </svg>
-                    <span>Disconnect Wallet</span>
+                    Disconnect
                   </button>
                 </div>
               )}
             </div>
+          ) : (
+            <button type="button" className="vita-btn-connect" onClick={onConnect}>
+              Connect wallet
+            </button>
+          )}
+        </div>
+      </header>
 
-            {/* Always Visible Direct Disconnect Button */}
+      {/* Full-width banner under the header when wallet connected & wrong chain ID */}
+      {isWrongNetwork && (
+        <div className="wrong-network-banner" role="alert">
+          <div className="wrong-network-banner-content">
+            <span className="wrong-network-msg">
+              Your wallet is on the wrong network. Please switch to {CHAIN_NAME}.
+            </span>
             <button
-              className="vita-btn-disconnect-direct"
-              onClick={onDisconnect}
-              title="Disconnect Wallet"
-              aria-label="Disconnect Wallet"
+              type="button"
+              className="btn-switch-network"
+              onClick={onSwitchNetwork}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
-                <line x1="12" y1="2" x2="12" y2="12" />
-              </svg>
-              <span>Disconnect</span>
+              Switch network
             </button>
           </div>
-        ) : (
-          <button className="vita-btn-connect" onClick={onConnect}>
-            Connect Wallet
-          </button>
-        )}
-      </div>
-    </header>
+        </div>
+      )}
+    </>
   );
 }

@@ -441,12 +441,10 @@ export default function App() {
           balance={balance}
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
           onConnect={handleOpenConnect}
           onDisconnect={disconnectWallet}
           onSwitchNetwork={switchNetwork}
-          activeWalletName={activeWalletName}
+          isRpcOnline={!dataLoadError}
         />
 
         {/* Main Tab Panels */}
@@ -467,7 +465,7 @@ export default function App() {
               account={account}
               signer={signer}
               onSwitchToBidder={handleSwitchToBidder}
-              searchQuery={searchQuery}
+              searchQuery=""
               latestBlockTimestamp={latestBlockTimestamp}
               isDataLoading={isDataLoading}
               dataLoadError={dataLoadError}
@@ -516,6 +514,21 @@ export default function App() {
           />
         )}
       </main>
+
+        {/* Global Footer (Step 4) */}
+        <footer className="vita-footer">
+          <div className="vita-footer-content">
+            <span>Demo prototype on {CHAIN_NAME}. Test tokens only. </span>
+            <a
+              href={`${EXPLORER_URL}/address/${CONTRACT_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-contract-link"
+            >
+              Contract {CONTRACT_ADDRESS.slice(0, 6)}...{CONTRACT_ADDRESS.slice(-4)} ↗
+            </a>
+          </div>
+        </footer>
 
         {/* Notification Toast */}
         <TxNotification
