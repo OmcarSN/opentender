@@ -11,6 +11,8 @@ This guide details how to configure, deploy, and execute the automated live demo
 - **Chain ID**: `91562037`
 - **Currency Symbol**: `tMSTC`
 - **Explorer**: `https://testnet.mstscan.com`
+- **Deployed Contract Address**: `0x493Bb88ad309346aA84E237aC84c8612eD1852d8`
+- **Explorer Contract Link**: `https://testnet.mstscan.com/address/0x493Bb88ad309346aA84E237aC84c8612eD1852d8`
 
 ---
 

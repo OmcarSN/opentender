@@ -37,22 +37,7 @@ The suite has been verified against Hardhat EVM with all 19 security audit and e
 
 ### Coverage Report (`solidity-coverage`)
 
-```
-----------------------|----------|----------|----------|----------|----------------|
-File                  |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
-----------------------|----------|----------|----------|----------|----------------|
- contracts\           |    93.75 |    58.28 |    91.18 |    88.06 |                |
-  OpenTender.sol      |    93.75 |    58.28 |    91.18 |    88.06 |... 8,1179,1190 |
- contracts\mocks\     |      100 |      100 |      100 |      100 |                |
-  MaliciousBidder.sol |      100 |      100 |      100 |      100 |                |
-----------------------|----------|----------|----------|----------|----------------|
-All files             |     93.9 |    58.84 |    93.02 |    88.57 |                |
-----------------------|----------|----------|----------|----------|----------------|
-```
-
-- **OpenTender.sol:** 93.75% Statements, 58.28% Branches, 91.18% Functions, 88.06% Lines.
-- **MaliciousBidder.sol (Mock):** 100% Statements, 100% Branches, 100% Functions, 100% Lines.
-- **All Files Total:** 93.90% Statements, 58.84% Branches, 93.02% Functions, 88.57% Lines.
+- **OpenTender.sol:** 93.75% statements, 58.28% branches
 
 ---
 
