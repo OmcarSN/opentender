@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ethers } from "ethers";
 import {
   CONTRACT_ADDRESS,
@@ -87,6 +87,9 @@ export default function App() {
     if (tenderId) setSelectedTenderId(Number(tenderId));
     handleTabChange("bidder");
   }
+
+  const readContract = useMemo(() => getReadOnlyContract(), []);
+
   const [tenders, setTenders] = useState([]);
   const [selectedTenderId, setSelectedTenderId] = useState(() => {
     try {
@@ -94,7 +97,7 @@ export default function App() {
       const t = params.get("tender");
       if (t) return parseInt(t, 10);
     } catch {}
-    return 1;
+    return null;
   });
   const [selectedTenderDetails, setSelectedTenderDetails] = useState(null);
   const [milestones, setMilestones] = useState([]);
@@ -121,8 +124,6 @@ export default function App() {
     setIsDataLoading(true);
     setDataLoadError(null);
     try {
-      const readContract = getReadOnlyContract();
-
       // Latest on-chain block timestamp
       const latestBlock = await readContract.runner.provider.getBlock("latest").catch(() => null);
       if (latestBlock) {
@@ -179,8 +180,8 @@ export default function App() {
       }
       setTenders(loadedTenders);
 
-      // Selected tender data
-      const targetId = selectedTenderId || (loadedTenders.length > 0 ? loadedTenders[0].id : 1);
+      // Selected tender data: default to newest tender if not explicitly set
+      const targetId = selectedTenderId || (loadedTenders.length > 0 ? loadedTenders[loadedTenders.length - 1].id : 1);
       if (count > 0 && targetId <= count) {
         const [details, ms, tl] = await Promise.all([
           readContract.getTenderDetails(targetId).catch(() => null),
@@ -200,10 +201,12 @@ export default function App() {
           });
         }
 
-        // Query committed bidders via event
+        // Query committed bidders via event with recent fromBlock limit
         try {
           const commitFilter = readContract.filters.BidCommitted(targetId);
-          const commitEvents = await readContract.queryFilter(commitFilter);
+          const latestBlockNum = latestBlock?.number || (await readContract.runner.provider.getBlockNumber().catch(() => 0));
+          const fromBlock = Math.max(0, latestBlockNum - 20000);
+          const commitEvents = await readContract.queryFilter(commitFilter, fromBlock);
           const bList = commitEvents.map((e) => ({
             bidder: e.args.bidder || e.args[1],
             commitHash: e.args.commitHash || e.args[2],
@@ -267,7 +270,7 @@ export default function App() {
   const checkAccountRoles = useCallback(async (userAddress, userSigner) => {
     if (!userAddress) return;
     try {
-      const contract = getReadOnlyContract();
+      const contract = readContract;
       const provider = contract.runner.provider;
 
       const userBalance = await provider.getBalance(userAddress);
@@ -463,7 +466,7 @@ export default function App() {
 
           {activeTab === "audit" && (
             <PublicAuditTab
-              contract={getReadOnlyContract()}
+              contract={readContract}
               tenders={tenders}
               selectedTenderId={selectedTenderId}
               onSelectTender={setSelectedTenderId}

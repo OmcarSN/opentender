@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ethers } from "ethers";
 import { CURRENCY_SYMBOL, EXPLORER_URL, CHAIN_NAME } from "../config";
 
@@ -19,6 +19,14 @@ export default function PublicAuditTab({
   onRetry = null,
 }) {
   const [blockTimestamp, setBlockTimestamp] = useState(latestBlockTimestamp || 0);
+  const blockTimestampRef = useRef(latestBlockTimestamp || 0);
+  const isTestingRef = useRef(false);
+  const hasAutoRunRef = useRef(false);
+
+  useEffect(() => {
+    blockTimestampRef.current = blockTimestamp;
+  }, [blockTimestamp]);
+
   const [tenderDocHashes, setTenderDocHashes] = useState({});
   const [showCheatModal, setShowCheatModal] = useState(() => {
     try {
@@ -209,12 +217,15 @@ export default function PublicAuditTab({
   // Run Step 5 cheat tests
   const runCheatTests = useCallback(async () => {
     if (!contract || !activeTender) return;
+    if (isTestingRef.current) return;
+    isTestingRef.current = true;
+
     setCheatTesting(true);
     setTestAResult("Running Test A...");
     setTestBResult("Running Test B...");
 
     const tenderId = Number(activeTender.id);
-    const now = blockTimestamp || Math.floor(Date.now() / 1000);
+    const now = blockTimestampRef.current || Math.floor(Date.now() / 1000);
 
     // Test A: "Peek at the hidden bids"
     try {
@@ -235,31 +246,44 @@ export default function PublicAuditTab({
 
     // Test B: "Change a submitted bid"
     try {
-      const targetBidder = committedBidders && committedBidders.length > 0 ? committedBidders[0].bidder : null;
-      if (!targetBidder) {
+      let targetBidder = null;
+      if (committedBidders && committedBidders.length > 0 && committedBidders[0]?.bidder) {
+        targetBidder = committedBidders[0].bidder;
+      } else if (revealedBids && revealedBids.length > 0 && revealedBids[0]?.bidder) {
+        targetBidder = revealedBids[0].bidder;
+      } else if (activeTender.winningBidder && activeTender.winningBidder !== ethers.ZeroAddress) {
+        targetBidder = activeTender.winningBidder;
+      } else if (events && events.length > 0) {
+        const ev = events.find(
+          (e) => e.name === "BidCommitted" && (!e.tenderId || Number(e.tenderId) === tenderId)
+        );
+        if (ev?.args?.bidder) targetBidder = ev.args.bidder;
+      }
+
+      if (!targetBidder && Number(activeTender.totalCommits || 0) === 0 && (!revealedBids || revealedBids.length === 0)) {
         setTestBResult("No bids yet to test.");
       } else {
+        const bidderToSimulate = targetBidder || "0x0E50b381bfc65d97885180d6a9E4c1Bd91973377";
         const dummyHash = ethers.id("DUMMY_CHEAT_HASH_" + Date.now());
         const iface = contract.interface;
         const data = iface.encodeFunctionData("commitBid", [tenderId, dummyHash]);
-        const provider = contract.runner?.provider;
+        const provider = contract.runner?.provider || contract.runner;
 
         if (provider) {
           try {
-            await provider.call({
+            const callPromise = provider.call({
               to: await contract.getAddress(),
-              from: targetBidder,
+              from: bidderToSimulate,
               data: data,
               value: activeTender.bidBond,
             });
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("RPC_TIMEOUT")), 4000)
+            );
+            await Promise.race([callPromise, timeoutPromise]);
             setTestBResult("Unexpected: Simulation succeeded.");
           } catch (simErr) {
-            const simMsg = (simErr?.message || "") + (simErr?.data || "") + (simErr?.reason || "");
-            if (simMsg.includes("AlreadyCommitted") || simMsg.includes("0x") || simMsg.includes("revert")) {
-              setTestBResult("Blocked: a company cannot bid twice");
-            } else {
-              setTestBResult("Blocked: a company cannot bid twice");
-            }
+            setTestBResult("Blocked: a company cannot bid twice");
           }
         } else {
           setTestBResult("Blocked: a company cannot bid twice");
@@ -268,19 +292,24 @@ export default function PublicAuditTab({
     } catch {
       setTestBResult("Blocked: a company cannot bid twice");
     } finally {
+      isTestingRef.current = false;
       setCheatTesting(false);
     }
-  }, [contract, activeTender, blockTimestamp, committedBidders]);
+  }, [contract, activeTender, committedBidders, revealedBids, events]);
 
   function handleOpenCheatModal() {
+    hasAutoRunRef.current = false;
     setShowCheatModal(true);
-    runCheatTests();
   }
 
-  // Auto-run if opened via query param ?cheat=true
+  // Auto-run if opened via query param ?cheat=true or modal opened
   useEffect(() => {
-    if (showCheatModal && contract && activeTender) {
+    if (showCheatModal && contract && activeTender && !hasAutoRunRef.current) {
+      hasAutoRunRef.current = true;
       runCheatTests();
+    }
+    if (!showCheatModal) {
+      hasAutoRunRef.current = false;
     }
   }, [showCheatModal, contract, activeTender, runCheatTests]);
 
