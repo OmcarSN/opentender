@@ -4999,6 +4999,8 @@ details[open] .details-chevron {
 @media (min-width: 1100px) {
   .officer-publish-col {
     position: sticky;
+    align-self: start;
+    height: fit-content;
     top: 24px;
   }
 }
