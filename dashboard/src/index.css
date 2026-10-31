@@ -3494,7 +3494,7 @@ input[type="file"]::file-selector-button:hover {
 .audit-tab-clean {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2.25rem;
   width: 100%;
 }
 
@@ -3502,18 +3502,20 @@ input[type="file"]::file-selector-button:hover {
 .audit-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 @media (max-width: 768px) {
   .audit-stats-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
   }
 }
 
 @media (max-width: 440px) {
   .audit-stats-grid {
     grid-template-columns: 1fr;
+    gap: 0.85rem;
   }
 }
 
@@ -3521,10 +3523,10 @@ input[type="file"]::file-selector-button:hover {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(0, 0, 0, 0.25) 100%), var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  padding: 1.25rem 1.35rem;
+  padding: 1.4rem 1.6rem;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.65rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
@@ -3548,7 +3550,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .audit-stat-card .stat-label {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   color: #94a3b8;
   font-weight: 600;
   text-transform: uppercase;
@@ -3556,7 +3558,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .audit-stat-card .stat-value {
-  font-size: 1.55rem;
+  font-size: 1.65rem;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: -0.02em;
@@ -3566,7 +3568,7 @@ input[type="file"]::file-selector-button:hover {
 .tenders-main-layout {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
   width: 100%;
 }
 
@@ -3574,7 +3576,7 @@ input[type="file"]::file-selector-button:hover {
   .tenders-main-layout {
     display: grid;
     grid-template-columns: 360px minmax(0, 1fr);
-    gap: 1.5rem;
+    gap: 2rem;
     align-items: start;
   }
 
@@ -3587,7 +3589,7 @@ input[type="file"]::file-selector-button:hover {
 .tenders-list-col {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1.1rem;
   min-width: 0;
 }
 
@@ -3599,18 +3601,18 @@ input[type="file"]::file-selector-button:hover {
 .tender-deadlines-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  font-size: 0.82rem;
+  border-radius: 12px;
+  font-size: 0.84rem;
 }
 
 .deadline-item {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
 }
 
 .deadline-label {
@@ -3624,11 +3626,11 @@ input[type="file"]::file-selector-button:hover {
 
 /* Tender Cards List */
 .section-header-clean {
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.35rem;
 }
 
 .section-title-clean {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #ffffff;
 }
@@ -3636,8 +3638,8 @@ input[type="file"]::file-selector-button:hover {
 .empty-state-clean {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 2.5rem;
+  border-radius: 14px;
+  padding: 3rem 2rem;
   text-align: center;
   color: var(--text-muted);
   font-size: 0.95rem;
@@ -3646,17 +3648,17 @@ input[type="file"]::file-selector-button:hover {
 .tender-cards-list {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1rem;
 }
 
 .tender-summary-card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
-  padding: 1.1rem;
+  padding: 1.25rem 1.35rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.95rem;
   transition: all 0.2s ease;
   cursor: pointer;
   user-select: none;
@@ -3677,7 +3679,7 @@ input[type="file"]::file-selector-button:hover {
 .tender-card-header {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.45rem;
 }
 
 .tender-card-title {
@@ -3690,13 +3692,13 @@ input[type="file"]::file-selector-button:hover {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--emerald-light);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .tender-card-countdown {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 8px;
-  padding: 0.4rem 0.65rem;
+  padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
   display: flex;
   justify-content: space-between;
@@ -3715,11 +3717,11 @@ input[type="file"]::file-selector-button:hover {
 .tender-card-financials {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.82rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  padding: 0.5rem 0.65rem;
+  gap: 0.45rem;
+  font-size: 0.83rem;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
 }
 
 .fin-item {
@@ -3741,11 +3743,11 @@ input[type="file"]::file-selector-button:hover {
 .tender-detail-view {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 1.5rem;
+  border-radius: 18px;
+  padding: 2rem 2.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -3753,21 +3755,21 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 1.25rem;
   flex-wrap: wrap;
-  padding-bottom: 1rem;
+  padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .detail-view-title {
-  font-size: 1.35rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: #ffffff;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.4rem;
 }
 
 .detail-view-status {
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   color: var(--emerald-light);
   font-weight: 600;
 }
@@ -3777,7 +3779,7 @@ input[type="file"]::file-selector-button:hover {
   border: 1px solid rgba(245, 158, 11, 0.4);
   color: #fde68a;
   border-radius: 8px;
-  padding: 0.55rem 1.1rem;
+  padding: 0.6rem 1.25rem;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -3795,30 +3797,30 @@ input[type="file"]::file-selector-button:hover {
 .progress-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  background: rgba(0, 0, 0, 0.25);
+  gap: 1.25rem;
+  background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 1.25rem;
+  border-radius: 14px;
+  padding: 1.5rem 1.6rem;
 }
 
 .progress-steps-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 @media (max-width: 680px) {
   .progress-steps-bar {
     grid-template-columns: 1fr 1fr;
-    gap: 0.85rem;
+    gap: 1rem;
   }
 }
 
 .progress-step-item {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.75rem;
   opacity: 0.4;
   transition: all 0.2s ease;
 }
@@ -3832,15 +3834,15 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .step-circle {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid var(--border-medium);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #ffffff;
   flex-shrink: 0;
@@ -3860,7 +3862,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .step-title {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: #ffffff;
 }
@@ -3872,9 +3874,9 @@ input[type="file"]::file-selector-button:hover {
 .what-happens-next-box {
   background: rgba(16, 185, 129, 0.08);
   border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 8px;
-  padding: 0.65rem 0.85rem;
-  font-size: 0.82rem;
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  font-size: 0.84rem;
 }
 
 .what-next-label {
@@ -3890,11 +3892,11 @@ input[type="file"]::file-selector-button:hover {
 .detail-section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .detail-section-title {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #ffffff;
 }
@@ -3908,7 +3910,7 @@ input[type="file"]::file-selector-button:hover {
 .clean-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   text-align: left;
 }
 
@@ -3916,13 +3918,13 @@ input[type="file"]::file-selector-button:hover {
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-muted);
   font-weight: 600;
-  padding: 0.65rem 0.85rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
 
 .clean-table td {
-  padding: 0.65rem 0.85rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   color: #f1f5f9;
   white-space: nowrap;
@@ -3934,17 +3936,17 @@ input[type="file"]::file-selector-button:hover {
 
 .clean-empty-msg {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-style: italic;
-  padding: 0.5rem 0;
+  padding: 0.75rem 0;
 }
 
 .status-sealed {
   background: rgba(148, 163, 184, 0.12);
   color: #cbd5e1;
-  padding: 0.2rem 0.5rem;
+  padding: 0.3rem 0.65rem;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
 }
 
@@ -3952,27 +3954,27 @@ input[type="file"]::file-selector-button:hover {
   background: rgba(16, 185, 129, 0.15);
   color: #6ee7b7;
   border: 1px solid rgba(16, 185, 129, 0.35);
-  padding: 0.2rem 0.55rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
 .label-revealed {
   background: rgba(255, 255, 255, 0.06);
   color: #cbd5e1;
-  padding: 0.2rem 0.5rem;
+  padding: 0.3rem 0.65rem;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
 }
 
 .label-forfeited {
   background: rgba(239, 68, 68, 0.15);
   color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.35);
-  padding: 0.2rem 0.55rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
 }
 
@@ -3997,19 +3999,19 @@ input[type="file"]::file-selector-button:hover {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
 .activity-clean-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0.85rem;
+  gap: 1.25rem;
+  padding: 0.75rem 1.1rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  font-size: 0.82rem;
+  border-radius: 10px;
+  font-size: 0.84rem;
   flex-wrap: wrap;
 }
 
