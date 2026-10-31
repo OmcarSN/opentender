@@ -3,17 +3,44 @@ import { ethers } from "ethers";
 import { CURRENCY_SYMBOL, EXPLORER_URL, CHAIN_NAME } from "../config";
 import { fmtAmount, fmtDateTime } from "../utils/format";
 
+// STEP 5: Deep normalization helper converting BigInt to string before comparison
+function deepNormalize(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return obj.toString();
+  if (typeof obj === "number" || typeof obj === "string" || typeof obj === "boolean") return obj;
+  if (Array.isArray(obj)) return obj.map(deepNormalize);
+  if (typeof obj === "object") {
+    const out = {};
+    const keys = Object.keys(obj);
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (/^\d+$/.test(k)) continue;
+      out[k] = deepNormalize(obj[k]);
+    }
+    return out;
+  }
+  return String(obj);
+}
+
+function areDataEqual(a, b) {
+  try {
+    return JSON.stringify(deepNormalize(a)) === JSON.stringify(deepNormalize(b));
+  } catch {
+    return false;
+  }
+}
+
 export default function PublicAuditTab({
   contract,
-  tenders = [],
+  tenders: propTenders = [],
   selectedTenderId,
   onSelectTender,
-  tenderDetails,
-  milestones = [],
-  revealedBids = [],
-  committedBidders = [],
-  platformStats,
-  events = [],
+  tenderDetails: propTenderDetails,
+  milestones: propMilestones = [],
+  revealedBids: propRevealedBids = [],
+  committedBidders: propCommittedBidders = [],
+  platformStats: propPlatformStats,
+  events: propEvents = [],
   latestBlockTimestamp = 0,
   isDataLoading = false,
   dataLoadError = null,
@@ -26,6 +53,46 @@ export default function PublicAuditTab({
       setInternalSelectedId(selectedTenderId);
     }
   }, [selectedTenderId]);
+
+  // STEP 4: Cache loaded data per tender id in a Map (useRef)
+  const tenderCacheRef = useRef(new Map());
+
+  // STEP 6: Reconnecting chip state
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const reconnectRetryTimeoutRef = useRef(null);
+
+  // STEP 7: Incremental getLogs block tracking
+  const lastSeenBlockRef = useRef(0);
+
+  // Internal reactive state to ensure seamless background polling without clearing
+  const [tenders, setTenders] = useState(propTenders || []);
+  const [platformStats, setPlatformStats] = useState(propPlatformStats || null);
+  const [events, setEvents] = useState(propEvents || []);
+
+  const [internalDetails, setInternalDetails] = useState(null);
+  const [internalMilestones, setInternalMilestones] = useState(null);
+  const [internalRevealedBids, setInternalRevealedBids] = useState(null);
+  const [internalCommittedBidders, setInternalCommittedBidders] = useState(null);
+  const [isInternalLoading, setIsInternalLoading] = useState(false);
+
+  // Sync prop updates when different
+  useEffect(() => {
+    if (propTenders && propTenders.length > 0) {
+      setTenders((prev) => (areDataEqual(prev, propTenders) ? prev : propTenders));
+    }
+  }, [propTenders]);
+
+  useEffect(() => {
+    if (propPlatformStats) {
+      setPlatformStats((prev) => (areDataEqual(prev, propPlatformStats) ? prev : propPlatformStats));
+    }
+  }, [propPlatformStats]);
+
+  useEffect(() => {
+    if (propEvents && propEvents.length > 0) {
+      setEvents((prev) => (areDataEqual(prev, propEvents) ? prev : propEvents));
+    }
+  }, [propEvents]);
 
   const handleSelectTender = useCallback(
     (id) => {
@@ -235,7 +302,8 @@ export default function PublicAuditTab({
   function getTenderHeading(id) {
     const rawHash =
       tenderDocHashes[id] ||
-      (Number(tenderDetails?.id) === Number(id) && tenderDetails?.documentHash) ||
+      (Number(propTenderDetails?.id) === Number(id) && propTenderDetails?.documentHash) ||
+      (Number(effectiveTenderDetails?.id) === Number(id) && effectiveTenderDetails?.documentHash) ||
       tenders.find((t) => Number(t.id) === Number(id))?.documentHash ||
       "";
     const snippet = rawHash && typeof rawHash === "string" ? rawHash.slice(0, 10) : "";
@@ -255,28 +323,169 @@ export default function PublicAuditTab({
       if (found) return found;
     }
     if (sortedTenders.length > 0) return sortedTenders[0];
-    return tenderDetails || null;
-  }, [internalSelectedId, selectedTenderId, tenders, sortedTenders, tenderDetails]);
+    return propTenderDetails || null;
+  }, [internalSelectedId, selectedTenderId, tenders, sortedTenders, propTenderDetails]);
 
-  // Isolated tender state: verify props match active tender, otherwise load independently
-  const isPropsForActive = Boolean(tenderDetails && Number(tenderDetails.id) === Number(activeTender?.id));
+  // In-flight request concurrency locks (STEP 2)
+  const inFlightCatalogRef = useRef(false);
+  const inFlightDetailsRef = useRef(false);
 
-  const [internalDetails, setInternalDetails] = useState(null);
-  const [internalMilestones, setInternalMilestones] = useState([]);
-  const [internalRevealedBids, setInternalRevealedBids] = useState([]);
-  const [internalCommittedBidders, setInternalCommittedBidders] = useState([]);
-  const [isInternalLoading, setIsInternalLoading] = useState(false);
-
+  // Active tender ID reference for stable closures
+  const activeTenderId = activeTender ? Number(activeTender.id) : null;
+  const activeTenderIdRef = useRef(activeTenderId);
   useEffect(() => {
-    if (!activeTender || isPropsForActive || !contract) {
-      return;
-    }
-    let isMounted = true;
-    setIsInternalLoading(true);
+    activeTenderIdRef.current = activeTenderId;
+  }, [activeTenderId]);
 
-    async function fetchTenderData() {
-      const tenderId = Number(activeTender.id);
+  // Is propTenderDetails specifically for active tender?
+  const isPropsForActive = Boolean(propTenderDetails && Number(propTenderDetails.id) === activeTenderId);
+
+  // STEP 7: Chunked getLogs helper (ranges of 5000 blocks)
+  const fetchLogsChunked = useCallback(async (provider, filter, fromBlock, toBlock) => {
+    const CHUNK_SIZE = 5000;
+    const allLogs = [];
+    let currentFrom = fromBlock;
+
+    while (currentFrom <= toBlock) {
+      const currentTo = Math.min(currentFrom + CHUNK_SIZE - 1, toBlock);
       try {
+        const chunkFilter = {
+          ...filter,
+          fromBlock: currentFrom,
+          toBlock: currentTo,
+        };
+        const chunkLogs = await provider.getLogs(chunkFilter);
+        if (chunkLogs && chunkLogs.length > 0) {
+          allLogs.push(...chunkLogs);
+        }
+      } catch {
+        // If range is still rejected, try half-range fallback
+        try {
+          const mid = Math.floor((currentFrom + currentTo) / 2);
+          const f1 = { ...filter, fromBlock: currentFrom, toBlock: mid };
+          const f2 = { ...filter, fromBlock: mid + 1, toBlock: currentTo };
+          const [l1, l2] = await Promise.all([provider.getLogs(f1), provider.getLogs(f2)]);
+          allLogs.push(...(l1 || []), ...(l2 || []));
+        } catch {
+          // Keep existing list on failure per STEP 7
+        }
+      }
+      currentFrom = currentTo + 1;
+    }
+    return allLogs;
+  }, []);
+
+  // REFRESH: Catalog & Platform Stats (every 15s per STEP 2)
+  const refreshCatalogAndStats = useCallback(async () => {
+    if (!contract || inFlightCatalogRef.current) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+
+    inFlightCatalogRef.current = true;
+    try {
+      const provider =
+        contract.runner?.provider ||
+        (contract.runner && typeof contract.runner.getBlock === "function" ? contract.runner : null);
+
+      if (provider) {
+        try {
+          const b = await provider.getBlock("latest");
+          if (b && isMountedRef.current) {
+            setBlockTimestamp((prev) => (prev !== Number(b.timestamp) ? Number(b.timestamp) : prev));
+          }
+        } catch {}
+      }
+
+      // Platform stats
+      try {
+        const stats = await contract.getPlatformStats();
+        if (stats && isMountedRef.current) {
+          const nextStats = {
+            tendersCount: stats[0],
+            registeredBidders: stats[1],
+            debarredBidders: stats[2],
+            awardedTenders: stats[3],
+            completedTenders: stats[4],
+            defaultedTenders: stats[5],
+            tvl: stats[6],
+          };
+          setPlatformStats((prev) => (areDataEqual(prev, nextStats) ? prev : nextStats));
+        }
+      } catch {}
+
+      // Tender list
+      let count = 0;
+      try {
+        const countBig = await contract.tenderCount();
+        count = Number(countBig);
+      } catch (err) {
+        throw err;
+      }
+
+      if (count > 0) {
+        const tenderPromises = [];
+        for (let i = 1; i <= count; i++) {
+          tenderPromises.push(contract.getTenderDetails(i).catch(() => null));
+        }
+        const results = await Promise.all(tenderPromises);
+        const loaded = [];
+        for (let i = 0; i < results.length; i++) {
+          const t = results[i];
+          if (t) {
+            loaded.push({
+              id: Number(t.id),
+              department: t.department,
+              ceilingPrice: t.ceilingPrice,
+              bidBond: t.bidBond,
+              commitDeadline: Number(t.commitDeadline),
+              revealDeadline: Number(t.revealDeadline),
+              escrowDeadline: Number(t.escrowDeadline),
+              gracePeriod: Number(t.gracePeriod),
+              completedMilestones: Number(t.completedMilestones),
+              status: Number(t.status),
+              winningBidder: t.winningBidder,
+              winningAmount: t.winningAmount,
+              approvalThreshold: Number(t.approvalThreshold),
+              totalCommits: Number(t.totalCommits),
+              documentHash: t.documentHash,
+            });
+          }
+        }
+        if (loaded.length > 0 && isMountedRef.current) {
+          setTenders((prev) => (areDataEqual(prev, loaded) ? prev : loaded));
+        }
+      }
+
+      // Success: clear reconnecting chip
+      if (isMountedRef.current) {
+        setIsReconnecting(false);
+      }
+    } catch {
+      // STEP 6: If refresh fails, keep old data, show Reconnecting chip, retry in 3s
+      if (isMountedRef.current) {
+        setIsReconnecting(true);
+        if (reconnectRetryTimeoutRef.current) clearTimeout(reconnectRetryTimeoutRef.current);
+        reconnectRetryTimeoutRef.current = setTimeout(() => {
+          refreshCatalogAndStats();
+        }, 3000);
+      }
+    } finally {
+      inFlightCatalogRef.current = false;
+    }
+  }, [contract]);
+
+  // REFRESH: Details for selected tender (bids, stages, activity) every 10s per STEP 2
+  const refreshTenderDetails = useCallback(
+    async (targetTenderId) => {
+      const tenderId = targetTenderId || activeTenderIdRef.current;
+      if (!contract || !tenderId || inFlightDetailsRef.current) return;
+      if (typeof document !== "undefined" && document.hidden) return;
+
+      inFlightDetailsRef.current = true;
+      try {
+        const provider =
+          contract.runner?.provider ||
+          (contract.runner && typeof contract.runner.getBlock === "function" ? contract.runner : null);
+
         const [d, ms] = await Promise.all([
           contract.getTenderDetails(tenderId).catch(() => null),
           contract.getMilestones(tenderId).catch(() => []),
@@ -293,7 +502,9 @@ export default function PublicAuditTab({
         try {
           if (contract.filters?.BidCommitted && typeof contract.queryFilter === "function") {
             const filter = contract.filters.BidCommitted(tenderId);
-            const evList = await contract.queryFilter(filter, 0);
+            const latestBlockNum = provider ? await provider.getBlockNumber().catch(() => 0) : 0;
+            const fromBlock = Math.max(0, latestBlockNum - 20000);
+            const evList = await contract.queryFilter(filter, fromBlock);
             committed = evList.map((e) => ({
               bidder: e.args?.bidder || e.args?.[1],
               commitHash: e.args?.commitHash || e.args?.[2],
@@ -304,31 +515,219 @@ export default function PublicAuditTab({
           committed = [];
         }
 
-        if (isMounted) {
-          if (d) setInternalDetails(d);
-          setInternalMilestones(ms || []);
-          setInternalRevealedBids(rev || []);
-          setInternalCommittedBidders(committed || []);
+        // STEP 7: Fetch activity events with getLogs (first load vs incremental)
+        if (provider) {
+          try {
+            const currentBlock = await provider.getBlockNumber();
+            const contractAddr = contract.target || (typeof contract.getAddress === "function" ? await contract.getAddress() : null);
+            if (contractAddr) {
+              let fromBlock = 0;
+              const isFirstEventsLoad = lastSeenBlockRef.current === 0;
+              if (isFirstEventsLoad) {
+                fromBlock = Math.max(0, currentBlock - 5000);
+              } else {
+                fromBlock = lastSeenBlockRef.current + 1;
+              }
+
+              if (fromBlock <= currentBlock) {
+                const logsFilter = {
+                  address: contractAddr,
+                };
+                const rawLogs = await fetchLogsChunked(provider, logsFilter, fromBlock, currentBlock);
+                const iface = contract.interface;
+                const newParsed = [];
+
+                for (let i = 0; i < rawLogs.length; i++) {
+                  try {
+                    const parsed = iface.parseLog(rawLogs[i]);
+                    if (parsed) {
+                      let evTenderId = null;
+                      if (parsed.args) {
+                        if (parsed.args.tenderId !== undefined) {
+                          evTenderId = Number(parsed.args.tenderId);
+                        } else if (
+                          (parsed.name.startsWith("Tender") ||
+                            parsed.name.startsWith("Bid") ||
+                            parsed.name.startsWith("Milestone") ||
+                            parsed.name === "EscrowFunded" ||
+                            parsed.name === "BondRefundClaimed") &&
+                          parsed.args[0] !== undefined
+                        ) {
+                          try {
+                            evTenderId = Number(parsed.args[0]);
+                          } catch {
+                            evTenderId = null;
+                          }
+                        }
+                      }
+
+                      const description =
+                        evTenderId !== null
+                          ? `${parsed.name} on tender #${evTenderId}`
+                          : `${parsed.name} event`;
+
+                      newParsed.push({
+                        name: parsed.name,
+                        tenderId: evTenderId,
+                        description: description,
+                        txHash: rawLogs[i].transactionHash,
+                        logIndex: rawLogs[i].index !== undefined ? rawLogs[i].index : i,
+                        blockNumber: rawLogs[i].blockNumber,
+                        time: "Confirmed",
+                        args: parsed.args,
+                      });
+                    }
+                  } catch {}
+                }
+
+                lastSeenBlockRef.current = currentBlock;
+
+                if (newParsed.length > 0) {
+                  setEvents((prev) => {
+                    const combined = isFirstEventsLoad ? newParsed.reverse() : [...newParsed.reverse(), ...prev];
+                    const seen = new Set();
+                    const deduped = [];
+                    for (const ev of combined) {
+                      const key = `${ev.txHash}-${ev.logIndex ?? 0}`;
+                      if (!seen.has(key)) {
+                        seen.add(key);
+                        deduped.push(ev);
+                      }
+                    }
+                    const capped = deduped.slice(0, 50);
+                    return capped;
+                  });
+                }
+              }
+            }
+          } catch {
+            // Keep existing events per STEP 7
+          }
+        }
+
+        // STEP 4 & 5: Cache and state update with deep comparison
+        if (isMountedRef.current && tenderId === activeTenderIdRef.current) {
+          const cacheEntry = {
+            details: d,
+            milestones: ms || [],
+            revealedBids: rev || [],
+            committedBidders: committed || [],
+          };
+          tenderCacheRef.current.set(tenderId, cacheEntry);
+
+          if (d) {
+            setInternalDetails((prev) => (areDataEqual(prev, d) ? prev : d));
+          }
+          setInternalMilestones((prev) => (areDataEqual(prev, ms || []) ? prev : (ms || [])));
+          setInternalRevealedBids((prev) => (areDataEqual(prev, rev || []) ? prev : (rev || [])));
+          setInternalCommittedBidders((prev) => (areDataEqual(prev, committed || []) ? prev : (committed || [])));
           setIsInternalLoading(false);
+          setIsReconnecting(false);
         }
       } catch {
-        if (isMounted) {
-          setIsInternalLoading(false);
+        // STEP 6: Keep old data, show Reconnecting chip, retry in 3s
+        if (isMountedRef.current) {
+          setIsReconnecting(true);
+          if (reconnectRetryTimeoutRef.current) clearTimeout(reconnectRetryTimeoutRef.current);
+          reconnectRetryTimeoutRef.current = setTimeout(() => {
+            refreshTenderDetails(tenderId);
+          }, 3000);
         }
+      } finally {
+        inFlightDetailsRef.current = false;
       }
+    },
+    [contract, fetchLogsChunked]
+  );
+
+  // Initial load & when activeTenderId changes: load from cache immediately or fetch
+  useEffect(() => {
+    if (!activeTenderId) return;
+
+    const cached = tenderCacheRef.current.get(activeTenderId);
+    if (cached) {
+      if (cached.details) setInternalDetails(cached.details);
+      if (cached.milestones) setInternalMilestones(cached.milestones);
+      if (cached.revealedBids) setInternalRevealedBids(cached.revealedBids);
+      if (cached.committedBidders) setInternalCommittedBidders(cached.committedBidders);
+      setIsInternalLoading(false);
+    } else if (!isPropsForActive) {
+      // Clear previous tender's internal data so it does not leak into the new tender
+      setInternalDetails(null);
+      setInternalMilestones(null);
+      setInternalRevealedBids(null);
+      setInternalCommittedBidders(null);
+      setIsInternalLoading(true);
     }
 
-    fetchTenderData();
+    if (!isPropsForActive) {
+      refreshTenderDetails(activeTenderId);
+    }
+  }, [activeTenderId, isPropsForActive, refreshTenderDetails]);
+
+  // STEP 2: Polling intervals & Page Visibility API
+  useEffect(() => {
+    refreshCatalogAndStats();
+
+    // 15-second interval for catalog & stats
+    const catalogInterval = setInterval(() => {
+      refreshCatalogAndStats();
+    }, 15000);
+
+    // 10-second interval for selected tender details
+    const detailsInterval = setInterval(() => {
+      refreshTenderDetails(activeTenderIdRef.current);
+    }, 10000);
+
+    // Pause all polling when document.hidden is true; refresh once when visible again
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        refreshCatalogAndStats();
+        if (activeTenderIdRef.current) {
+          refreshTenderDetails(activeTenderIdRef.current);
+        }
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
 
     return () => {
-      isMounted = false;
+      clearInterval(catalogInterval);
+      clearInterval(detailsInterval);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
     };
-  }, [activeTender?.id, isPropsForActive, contract]);
+  }, [refreshCatalogAndStats, refreshTenderDetails]);
 
-  const effectiveMilestones = isPropsForActive ? milestones : internalMilestones;
-  const effectiveRevealedBids = isPropsForActive ? revealedBids : internalRevealedBids;
-  const effectiveCommittedBidders = isPropsForActive ? committedBidders : internalCommittedBidders;
-  const effectiveTenderDetails = isPropsForActive ? tenderDetails : internalDetails;
+  // STEP 3: Fallback resolution - NEVER clear data during a refresh
+  const effectiveMilestones = isPropsForActive
+    ? propMilestones
+    : internalMilestones !== null
+    ? internalMilestones
+    : propMilestones;
+
+  const effectiveRevealedBids = isPropsForActive
+    ? propRevealedBids
+    : internalRevealedBids !== null
+    ? internalRevealedBids
+    : propRevealedBids;
+
+  const effectiveCommittedBidders = isPropsForActive
+    ? propCommittedBidders
+    : internalCommittedBidders !== null
+    ? internalCommittedBidders
+    : propCommittedBidders;
+
+  const effectiveTenderDetails = isPropsForActive
+    ? propTenderDetails
+    : internalDetails || activeTender;
+
+  // Has ANY data loaded yet for bids/stages?
+  const hasBidsData = (effectiveCommittedBidders && effectiveCommittedBidders.length > 0) || (effectiveRevealedBids && effectiveRevealedBids.length > 0) || internalCommittedBidders !== null || internalRevealedBids !== null || (propCommittedBidders && propCommittedBidders.length > 0) || (propRevealedBids && propRevealedBids.length > 0);
+  const hasStagesData = (effectiveMilestones && effectiveMilestones.length > 0) || internalMilestones !== null || (propMilestones && propMilestones.length > 0);
 
   // Helper to parse custom contract error names from reverts
   function parseCustomErrorName(err, iface) {
@@ -733,6 +1132,7 @@ export default function PublicAuditTab({
           sentence,
           time: ev.time || "Confirmed",
           txHash: ev.txHash,
+          logIndex: ev.logIndex,
         };
       });
   }, [events, activeTender]);
@@ -804,6 +1204,26 @@ export default function PublicAuditTab({
         <aside className="tenders-list-col" aria-label="Tenders Catalog">
           <div className="section-header-clean">
             <h2 className="section-title-clean">Tenders</h2>
+            {/* STEP 6: Small Reconnecting... chip near page title */}
+            {isReconnecting && (
+              <span
+                className="reconnecting-chip font-mono"
+                role="status"
+                aria-live="polite"
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "2px 8px",
+                  borderRadius: "4px",
+                  backgroundColor: "rgba(234, 179, 8, 0.15)",
+                  color: "#eab308",
+                  border: "1px solid rgba(234, 179, 8, 0.3)",
+                  marginLeft: "auto",
+                  fontWeight: 600,
+                }}
+              >
+                Reconnecting...
+              </span>
+            )}
           </div>
 
           {tenders.length === 0 ? (
@@ -935,7 +1355,7 @@ export default function PublicAuditTab({
               {/* b) "Bids" table */}
               <div className="detail-section">
                 <h3 className="detail-section-title">Bids</h3>
-                {isDataLoading || (!isPropsForActive && isInternalLoading) ? (
+                {(isDataLoading || (!hasBidsData && isInternalLoading)) ? (
                   <p className="clean-empty-msg">Loading bids...</p>
                 ) : (effectiveCommittedBidders?.length ?? 0) === 0 ? (
                   <p className="clean-empty-msg">No bids yet</p>
@@ -949,14 +1369,17 @@ export default function PublicAuditTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {effectiveCommittedBidders.map((b, i) => (
-                          <tr key={i}>
-                            <td className="font-mono">{b.bidder ? `${b.bidder.slice(0, 6)}...${b.bidder.slice(-4)}` : "--"}</td>
-                            <td>
-                              <span className="status-sealed">🔒 Sealed</span>
-                            </td>
-                          </tr>
-                        ))}
+                        {effectiveCommittedBidders.map((b) => {
+                          const addrKey = b.bidder || `bid-${b.commitHash || Math.random()}`;
+                          return (
+                            <tr key={addrKey}>
+                              <td className="font-mono">{b.bidder ? `${b.bidder.slice(0, 6)}...${b.bidder.slice(-4)}` : "--"}</td>
+                              <td>
+                                <span className="status-sealed">🔒 Sealed</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -971,15 +1394,16 @@ export default function PublicAuditTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {effectiveRevealedBids.map((b, i) => {
+                        {effectiveRevealedBids.map((b) => {
                           const winningBidder = effectiveTenderDetails?.winningBidder || activeTender?.winningBidder;
                           const isWinner =
                             winningBidder &&
                             winningBidder !== ethers.ZeroAddress &&
                             b.bidder &&
                             winningBidder.toLowerCase() === b.bidder.toLowerCase();
+                          const rowKey = b.bidder ? `rev-${b.bidder.toLowerCase()}` : `rev-${b.amount}`;
                           return (
-                            <tr key={`rev-${i}`}>
+                            <tr key={rowKey}>
                               <td className="font-mono">{b.bidder ? `${b.bidder.slice(0, 6)}...${b.bidder.slice(-4)}` : "--"}</td>
                               <td className="font-mono">{fmtAmount(b.amount ?? 0n)} {CURRENCY_SYMBOL}</td>
                               <td>
@@ -995,15 +1419,18 @@ export default function PublicAuditTab({
                         {/* Committed bidders that did not reveal */}
                         {effectiveCommittedBidders
                           .filter((cb) => cb.bidder && !effectiveRevealedBids.some((rb) => rb.bidder && rb.bidder.toLowerCase() === cb.bidder.toLowerCase()))
-                          .map((cb, i) => (
-                            <tr key={`unrev-${i}`}>
-                              <td className="font-mono">{cb.bidder ? `${cb.bidder.slice(0, 6)}...${cb.bidder.slice(-4)}` : "--"}</td>
-                              <td className="font-mono">-</td>
-                              <td>
-                                <span className="label-forfeited">Did not open: deposit forfeited</span>
-                              </td>
-                            </tr>
-                          ))}
+                          .map((cb) => {
+                            const unrevKey = `unrev-${cb.bidder.toLowerCase()}`;
+                            return (
+                              <tr key={unrevKey}>
+                                <td className="font-mono">{cb.bidder ? `${cb.bidder.slice(0, 6)}...${cb.bidder.slice(-4)}` : "--"}</td>
+                                <td className="font-mono">-</td>
+                                <td>
+                                  <span className="label-forfeited">Did not open: deposit forfeited</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
@@ -1013,7 +1440,7 @@ export default function PublicAuditTab({
               {/* c) "Payment stages" table from getMilestones */}
               <div className="detail-section">
                 <h3 className="detail-section-title">Payment stages</h3>
-                {isDataLoading || (!isPropsForActive && isInternalLoading) ? (
+                {(isDataLoading || (!hasStagesData && isInternalLoading)) ? (
                   <p className="clean-empty-msg">Loading payment stages...</p>
                 ) : effectiveMilestones && effectiveMilestones.length > 0 ? (
                   <div className="table-responsive">
@@ -1089,22 +1516,25 @@ export default function PublicAuditTab({
                 <h3 className="detail-section-title">Activity</h3>
                 {activityList.length > 0 ? (
                   <ul className="activity-clean-list">
-                    {activityList.map((act, i) => (
-                      <li key={i} className="activity-clean-item">
-                        <span className="activity-sentence">{act.sentence}</span>
-                        <span className="activity-time">{act.time}</span>
-                        {act.txHash && cleanExplorerUrl && (
-                          <a
-                            href={`${cleanExplorerUrl}/tx/${act.txHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="activity-link"
-                          >
-                            Tx ↗
-                          </a>
-                        )}
-                      </li>
-                    ))}
+                    {activityList.map((act, i) => {
+                      const rowKey = act.txHash ? `${act.txHash}-${act.logIndex ?? i}` : `act-${i}`;
+                      return (
+                        <li key={rowKey} className="activity-clean-item">
+                          <span className="activity-sentence">{act.sentence}</span>
+                          <span className="activity-time">{act.time}</span>
+                          {act.txHash && cleanExplorerUrl && (
+                            <a
+                              href={`${cleanExplorerUrl}/tx/${act.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="activity-link"
+                            >
+                              Tx ↗
+                            </a>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="clean-empty-msg">No activity recorded for this tender yet.</p>
