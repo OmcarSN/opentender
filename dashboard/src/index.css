@@ -1,28 +1,27 @@
 /* ==========================================================================
-   OpenTender Dashboard: VITA Inspired Luxury Dark Theme
-   Based on VITA Travel Landing Page by Phenomenon
-   Deep spruce/pine green palette, ambient emerald glows, crisp typography
+   OpenTender Dashboard: Professional Matte Off-White & Titanium Palette
+   Architectural high-contrast typography, matte surfaces, crisp borders
    ========================================================================== */
 
 :root {
-  --bg-page: #060e0d;
-  --bg-container: #0b1413;
-  --bg-card: #0f1c1a;
-  --bg-card-hover: #142522;
-  --bg-surface: #11201e;
-  --bg-input: #081211;
+  --bg-page: #0b0c10;
+  --bg-container: #101216;
+  --bg-card: #15181e;
+  --bg-card-hover: #1b1f27;
+  --bg-surface: #171b22;
+  --bg-input: #0c0e12;
   
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-medium: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.26);
   
   --text-pure: #ffffff;
-  --text-main: rgba(255, 255, 255, 0.9);
-  --text-muted: rgba(255, 255, 255, 0.55);
-  --text-faint: rgba(255, 255, 255, 0.35);
+  --text-main: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --text-faint: #71717a;
   
-  --emerald: #10b981;
-  --emerald-light: #34d399;
+  --emerald: #f4f4f5;
+  --emerald-light: #e4e4e7;
   --gold: #f59e0b;
   --gold-star: #eab308;
   --cyan: #06b6d4;
@@ -68,9 +67,9 @@ header, nav, nav a, button, .tab, .pill {
   box-sizing: border-box;
   overflow-x: hidden;
   background: 
-    radial-gradient(1200px circle at 50% -5%, rgba(22, 65, 60, 0.45) 0%, rgba(9, 21, 20, 0.92) 50%, #060e0d 100%),
-    radial-gradient(800px circle at 85% 60%, rgba(16, 185, 129, 0.06) 0%, transparent 60%),
-    radial-gradient(800px circle at 15% 70%, rgba(6, 182, 212, 0.05) 0%, transparent 60%);
+    radial-gradient(1200px circle at 50% -5%, rgba(255, 255, 255, 0.05) 0%, rgba(16, 18, 22, 0.98) 50%, #0b0c10 100%),
+    radial-gradient(800px circle at 85% 60%, rgba(244, 244, 245, 0.02) 0%, transparent 60%),
+    radial-gradient(800px circle at 15% 70%, rgba(249, 115, 22, 0.02) 0%, transparent 60%);
   padding: 1.5rem 1.25rem 2rem 1.25rem;
   display: flex;
   justify-content: center;
@@ -514,8 +513,8 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .vita-btn-connect {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, rgba(244, 244, 245, 0.12) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid rgba(244, 244, 245, 0.32);
   color: #ffffff;
   border-radius: 9999px;
   padding: 0.45rem 1.15rem;
@@ -527,9 +526,9 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .vita-btn-connect:hover {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.2) 100%);
-  border-color: rgba(52, 211, 153, 0.6);
-  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+  background: linear-gradient(135deg, rgba(244, 244, 245, 0.20) 0%, rgba(6, 182, 212, 0.2) 100%);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 15px rgba(244, 244, 245, 0.24);
   transform: translateY(-1px);
   color: #ffffff;
 }
@@ -638,7 +637,7 @@ header, nav, nav a, button, .tab, .pill {
 
 .vita-explore-btn {
   background: #ffffff;
-  color: #0b1413;
+  color: #101216;
   font-size: 0.92rem;
   font-weight: 600;
   padding: 0.85rem 2rem;
@@ -651,7 +650,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .vita-explore-btn:hover {
-  background: #f0fdf4;
+  background: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
 }
@@ -716,7 +715,7 @@ header, nav, nav a, button, .tab, .pill {
 
 .category-chip.active {
   background: #ffffff;
-  color: #0b1413;
+  color: #101216;
   font-weight: 600;
   box-shadow: 0 2px 10px rgba(255, 255, 255, 0.15);
 }
@@ -838,8 +837,8 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .tender-travel-card.is-selected {
-  border-color: rgba(16, 185, 129, 0.4);
-  box-shadow: 0 0 25px rgba(16, 185, 129, 0.1);
+  border-color: rgba(244, 244, 245, 0.32);
+  box-shadow: 0 0 25px rgba(244, 244, 245, 0.09);
 }
 
 /* Left Image Thumbnail */
@@ -1071,7 +1070,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .btn-book-now {
-  background: #182e2a;
+  background: #1e222b;
   border: 1px solid var(--border-medium);
   color: #ffffff;
   font-size: 0.82rem;
@@ -1085,7 +1084,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .btn-book-now:hover {
-  background: #223f3a;
+  background: #272c38;
   border-color: rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
 }
@@ -1137,8 +1136,8 @@ header, nav, nav a, button, .tab, .pill {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(244, 244, 245, 0.07);
+  border: 1px solid rgba(244, 244, 245, 0.16);
 }
 
 .empty-catalog-card h3 {
@@ -1159,7 +1158,7 @@ header, nav, nav a, button, .tab, .pill {
 
 .empty-reset-btn {
   background: #ffffff;
-  color: #0b1413;
+  color: #101216;
   font-size: 0.85rem;
   font-weight: 600;
   padding: 0.65rem 1.75rem;
@@ -1171,7 +1170,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .empty-reset-btn:hover {
-  background: #f0fdf4;
+  background: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25);
 }
@@ -1336,10 +1335,10 @@ header, nav, nav a, button, .tab, .pill {
 .badge-shield-mini {
   font-size: 0.72rem;
   color: var(--emerald-light);
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(244, 244, 245, 0.10);
   padding: 0.25rem 0.65rem;
   border-radius: 9999px;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(244, 244, 245, 0.24);
 }
 
 /* Tables in Modal */
@@ -1436,7 +1435,7 @@ header, nav, nav a, button, .tab, .pill {
 
 .modal-footer .btn-book-now {
   background: #ffffff;
-  color: #0b1413;
+  color: #101216;
   border-color: #ffffff;
   font-weight: 600;
   width: auto;
@@ -1444,7 +1443,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .modal-footer .btn-book-now:hover {
-  background: #f0fdf4;
+  background: #ffffff;
   box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
 }
 
@@ -1537,7 +1536,7 @@ header, nav, nav a, button, .tab, .pill {
 
 .web3-wallet-row.is-connecting {
   border-color: var(--emerald);
-  background: rgba(16, 185, 129, 0.06);
+  background: rgba(244, 244, 245, 0.05);
 }
 
 .web3-wallet-icon-wrap {
@@ -1656,9 +1655,9 @@ header, nav, nav a, button, .tab, .pill {
   font-weight: 600;
   padding: 0.15rem 0.55rem;
   border-radius: 9999px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(244, 244, 245, 0.10);
+  color: #f4f4f5;
+  border: 1px solid rgba(244, 244, 245, 0.24);
 }
 
 .web3-chevron {
@@ -1729,9 +1728,9 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .attack-badge.blocked {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(244, 244, 245, 0.12);
   color: var(--emerald-light);
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(244, 244, 245, 0.28);
 }
 
 .attack-desc {
@@ -1807,10 +1806,10 @@ header, nav, nav a, button, .tab, .pill {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--emerald-light);
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(244, 244, 245, 0.10);
   padding: 0.25rem 0.65rem;
   border-radius: 9999px;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(244, 244, 245, 0.20);
 }
 
 .form-card {
@@ -1855,9 +1854,9 @@ header, nav, nav a, button, .tab, .pill {
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-  border-color: rgba(16, 185, 129, 0.5);
+  border-color: rgba(244, 244, 245, 0.40);
   background: rgba(0, 0, 0, 0.42);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 0 3px rgba(244, 244, 245, 0.12);
 }
 
 .form-group select option {
@@ -1881,7 +1880,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .btn-mini {
-  background: #182e2a;
+  background: #1e222b;
   border: 1px solid var(--border-medium);
   color: #ffffff;
   font-size: 0.75rem;
@@ -1893,7 +1892,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .btn-mini:hover {
-  background: #223f3a;
+  background: #272c38;
   border-color: rgba(255, 255, 255, 0.3);
 }
 
@@ -1903,7 +1902,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .hash-preview-box {
-  background: #060e0d;
+  background: #0b0c10;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 0.85rem 1rem;
@@ -1925,17 +1924,17 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .alert-banner {
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(244, 244, 245, 0.07);
+  border: 1px solid rgba(244, 244, 245, 0.20);
   border-radius: 10px;
   padding: 0.75rem 1rem;
   font-size: 0.78rem;
-  color: #a7f3d0;
+  color: #e4e4e7;
 }
 
 .btn-primary-action {
   background: #ffffff;
-  color: #0b1413;
+  color: #101216;
   font-size: 0.92rem;
   font-weight: 600;
   padding: 0.85rem 1.5rem;
@@ -1947,13 +1946,13 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .btn-primary-action:hover {
-  background: #f0fdf4;
+  background: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15);
 }
 
 .btn-secondary-action {
-  background: #182e2a;
+  background: #1e222b;
   border: 1px solid var(--border-medium);
   color: #ffffff;
   font-size: 0.88rem;
@@ -1966,7 +1965,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .btn-secondary-action:hover {
-  background: #223f3a;
+  background: #272c38;
   border-color: rgba(255, 255, 255, 0.25);
 }
 
@@ -2005,8 +2004,8 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .tx-toast.is-success {
-  border-color: rgba(16, 185, 129, 0.3);
-  box-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(16, 185, 129, 0.25), 0 8px 24px -4px rgba(16, 185, 129, 0.12);
+  border-color: rgba(244, 244, 245, 0.24);
+  box-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(244, 244, 245, 0.20), 0 8px 24px -4px rgba(244, 244, 245, 0.10);
 }
 
 .tx-toast.is-pending {
@@ -2037,9 +2036,9 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .tx-status-badge.success-badge {
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.24);
-  color: #34d399;
+  background: rgba(244, 244, 245, 0.12);
+  border: 1px solid rgba(244, 244, 245, 0.25);
+  color: #f4f4f5;
 }
 
 .tx-spinner {
@@ -2158,7 +2157,7 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .is-success .tx-toast-timer-fill {
-  background: linear-gradient(90deg, #10b981, #059669);
+  background: linear-gradient(90deg, #f4f4f5, #a1a1aa);
 }
 
 .is-paused .tx-toast-timer-fill {
@@ -2244,28 +2243,30 @@ header, nav, nav a, button, .tab, .pill {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: #04140e;
+  background: #f4f4f5;
+  color: #09090b;
   font-weight: 700;
-  border: 1px solid rgba(52, 211, 153, 0.35);
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.22);
+  border: 1px solid #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 1px 1px rgba(255, 255, 255, 0.4) inset;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  background: #ffffff;
+  color: #000000;
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.38);
-  border-color: rgba(52, 211, 153, 0.6);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2), 0 0 2px 1px rgba(255, 255, 255, 0.9) inset;
+  border-color: #ffffff;
 }
 
 .btn-secondary {
-  background: #182e2a;
+  background: #1e222b;
   border-color: var(--border-medium);
   color: #ffffff;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #223f3a;
+  background: #272c38;
   border-color: rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
 }
@@ -2573,7 +2574,7 @@ header, nav, nav a, button, .tab, .pill {
 
 /* File input styling */
 input[type="file"]::file-selector-button {
-  background: #182e2a;
+  background: #1e222b;
   border: 1px solid var(--border-medium);
   color: #ffffff;
   padding: 0.35rem 0.75rem;
@@ -2585,15 +2586,15 @@ input[type="file"]::file-selector-button {
 }
 
 input[type="file"]::file-selector-button:hover {
-  background: #223f3a;
+  background: #272c38;
 }
 
 /* ==========================================================================
    Computed Hash Box (Bidder Commit Form)
    ========================================================================== */
 .computed-hash-box {
-  background: rgba(16, 185, 129, 0.06);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(244, 244, 245, 0.05);
+  border: 1px solid rgba(244, 244, 245, 0.16);
   border-radius: 12px;
   padding: 1rem 1.15rem;
 }
@@ -2636,12 +2637,12 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .saved-bid-pill {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(244, 244, 245, 0.09);
+  border: 1px solid rgba(244, 244, 245, 0.20);
   border-radius: 10px;
   padding: 0.75rem 1rem;
   font-size: 0.82rem;
-  color: #a7f3d0;
+  color: #e4e4e7;
 }
 
 .backup-upload-box {
@@ -2673,7 +2674,7 @@ input[type="file"]::file-selector-button:hover {
 
 .field-validation-success {
   font-size: 0.74rem;
-  color: #6ee7b7;
+  color: #f4f4f5;
   margin-top: 0.25rem;
   display: flex;
   align-items: center;
@@ -2719,9 +2720,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .portal-alert.alert-success {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  color: #a7f3d0;
+  background: rgba(244, 244, 245, 0.09);
+  border: 1px solid rgba(244, 244, 245, 0.24);
+  color: #e4e4e7;
 }
 
 .portal-alert-icon {
@@ -2775,11 +2776,11 @@ input[type="file"]::file-selector-button:hover {
 .keyfile-status-badge {
   font-size: 0.72rem;
   font-weight: 600;
-  color: #6ee7b7;
-  background: rgba(16, 185, 129, 0.12);
+  color: #f4f4f5;
+  background: rgba(244, 244, 245, 0.10);
   padding: 0.2rem 0.55rem;
   border-radius: 9999px;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(244, 244, 245, 0.20);
 }
 
 .keyfile-hidden-input {
@@ -2818,7 +2819,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .text-success {
-  color: #6ee7b7 !important;
+  color: #f4f4f5 !important;
 }
 
 .backup-upload-box input[type="file"] {
@@ -2842,9 +2843,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .badge-shield {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(244, 244, 245, 0.10);
   color: var(--emerald-light);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(244, 244, 245, 0.20);
 }
 
 .badge-reveal {
@@ -2878,8 +2879,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .attack-step-card.blocked {
-  border-color: rgba(16, 185, 129, 0.35);
-  background: rgba(16, 185, 129, 0.04);
+  border-color: rgba(244, 244, 245, 0.28);
+  background: rgba(244, 244, 245, 0.05);
 }
 
 .attack-step-card.failed {
@@ -2924,9 +2925,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .status-pill.blocked {
-  background: rgba(16, 185, 129, 0.15);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: rgba(244, 244, 245, 0.12);
+  color: #f4f4f5;
+  border: 1px solid rgba(244, 244, 245, 0.28);
 }
 
 .status-pill.failed {
@@ -2956,7 +2957,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .attack-step-card.blocked .attack-step-result {
-  color: #6ee7b7;
+  color: #f4f4f5;
 }
 
 /* ==========================================================================
@@ -3538,13 +3539,13 @@ input[type="file"]::file-selector-button:hover {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.45), transparent);
+  background: linear-gradient(90deg, transparent, rgba(244, 244, 245, 0.36), transparent);
 }
 
 .audit-stat-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(16, 185, 129, 0.3);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(16, 185, 129, 0.08);
+  border-color: rgba(244, 244, 245, 0.24);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(244, 244, 245, 0.07);
 }
 
 .audit-stat-card .stat-label {
@@ -3599,8 +3600,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .audit-search-input:focus {
-  border-color: rgba(16, 185, 129, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(244, 244, 245, 0.40) !important;
+  box-shadow: 0 0 0 3px rgba(244, 244, 245, 0.12) !important;
   background: rgba(0, 0, 0, 0.4) !important;
   outline: none !important;
 }
@@ -3620,8 +3621,8 @@ input[type="file"]::file-selector-button:hover {
 
 .audit-category-select:focus,
 .audit-procurement-select:focus {
-  border-color: rgba(16, 185, 129, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(244, 244, 245, 0.40) !important;
+  box-shadow: 0 0 0 3px rgba(244, 244, 245, 0.12) !important;
   outline: none;
 }
 
@@ -3688,9 +3689,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .tender-summary-card.selected {
-  border-color: rgba(16, 185, 129, 0.5);
-  background: rgba(16, 185, 129, 0.04);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+  border-color: rgba(244, 244, 245, 0.40);
+  background: rgba(244, 244, 245, 0.05);
+  box-shadow: 0 0 20px rgba(244, 244, 245, 0.09);
 }
 
 .tender-card-header {
@@ -3893,7 +3894,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .progress-step-item.completed .step-circle {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(244, 244, 245, 0.16);
   border-color: var(--emerald);
   color: var(--emerald-light);
 }
@@ -3902,7 +3903,7 @@ input[type="file"]::file-selector-button:hover {
   background: var(--emerald);
   border-color: var(--emerald);
   color: #04100c;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 12px rgba(244, 244, 245, 0.40);
 }
 
 .step-title {
@@ -3916,8 +3917,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .what-happens-next-box {
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(244, 244, 245, 0.07);
+  border: 1px solid rgba(244, 244, 245, 0.16);
   border-radius: 8px;
   padding: 0.65rem 0.85rem;
   font-size: 0.82rem;
@@ -3995,9 +3996,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .label-winner {
-  background: rgba(16, 185, 129, 0.15);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: rgba(244, 244, 245, 0.12);
+  color: #f4f4f5;
+  border: 1px solid rgba(244, 244, 245, 0.28);
   padding: 0.2rem 0.55rem;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -4023,7 +4024,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .stage-approved {
-  color: #6ee7b7;
+  color: #f4f4f5;
   font-weight: 600;
 }
 
@@ -4257,7 +4258,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .deposit-callout-box {
-  background: rgba(16, 185, 129, 0.08);
+  background: rgba(244, 244, 245, 0.07);
   border-left: 3px solid var(--emerald);
   border-radius: 6px;
   padding: 0.65rem 0.85rem;
@@ -4374,8 +4375,8 @@ details[open] .details-chevron {
 }
 
 .milestone-auto-tag {
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(244, 244, 245, 0.10);
+  border: 1px solid rgba(244, 244, 245, 0.20);
   color: var(--emerald-light);
   font-weight: 600;
   font-size: 0.88rem;
@@ -4517,7 +4518,7 @@ details[open] .details-chevron {
 .home-hero {
   text-align: center;
   padding: 3.5rem 2rem 2.5rem;
-  background: radial-gradient(circle at 50% 20%, rgba(16, 185, 129, 0.12) 0%, rgba(6, 182, 212, 0.04) 40%, rgba(0, 0, 0, 0.35) 85%);
+  background: radial-gradient(circle at 50% 20%, rgba(244, 244, 245, 0.10) 0%, rgba(6, 182, 212, 0.04) 40%, rgba(0, 0, 0, 0.35) 85%);
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
@@ -4577,17 +4578,17 @@ details[open] .details-chevron {
 }
 
 .home-step-card:hover {
-  border-color: rgba(16, 185, 129, 0.45);
+  border-color: rgba(244, 244, 245, 0.36);
   transform: translateY(-3px);
-  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(16, 185, 129, 0.1);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(244, 244, 245, 0.09);
 }
 
 .step-badge {
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--emerald-light);
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(244, 244, 245, 0.10);
+  border: 1px solid rgba(244, 244, 245, 0.20);
   padding: 0.2rem 0.55rem;
   border-radius: 6px;
   width: fit-content;
