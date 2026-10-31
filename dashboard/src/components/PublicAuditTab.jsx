@@ -1,7 +1,25 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ethers } from "ethers";
-import { CURRENCY_SYMBOL, EXPLORER_URL, CHAIN_NAME } from "../config";
+import { CURRENCY_SYMBOL, EXPLORER_URL, CHAIN_NAME, DEPLOY_BLOCK, getReadOnlyProvider } from "../config";
 import { fmtAmount, fmtDateTime } from "../utils/format";
+
+// Concurrency limiter helper: limits parallel asynchronous operations to maxConcurrent
+async function runWithConcurrencyLimit(tasks, maxConcurrent = 3) {
+  const results = new Array(tasks.length);
+  let nextIndex = 0;
+  const workers = new Array(Math.min(maxConcurrent, tasks.length)).fill(0).map(async () => {
+    while (nextIndex < tasks.length) {
+      const idx = nextIndex++;
+      try {
+        results[idx] = await tasks[idx]();
+      } catch (err) {
+        results[idx] = null;
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 // STEP 5: Deep normalization helper converting BigInt to string before comparison
 function deepNormalize(obj) {
@@ -57,11 +75,15 @@ export default function PublicAuditTab({
   // STEP 4: Cache loaded data per tender id in a Map (useRef)
   const tenderCacheRef = useRef(new Map());
 
-  // STEP 6: Reconnecting chip state
-  const [isReconnecting, setIsReconnecting] = useState(false);
-  const reconnectRetryTimeoutRef = useRef(null);
+  // STEP 2 & 5: Refresh timestamp & error chip state
+  const [lastUpdatedTime, setLastUpdatedTime] = useState(() => {
+    const d = new Date();
+    return d.toTimeString().split(" ")[0];
+  });
+  const [refreshErrorChip, setRefreshErrorChip] = useState(false);
+  const isRefreshRunningRef = useRef(false);
 
-  // STEP 7: Incremental getLogs block tracking
+  // STEP 3: Incremental getLogs block tracking
   const lastSeenBlockRef = useRef(0);
 
   // Internal reactive state to ensure seamless background polling without clearing
@@ -148,14 +170,15 @@ export default function PublicAuditTab({
     };
   }, [showCheatModal]);
 
-  // Sync block timestamp
+  // Sync block timestamp once on mount or when contract changes (no polling interval)
   useEffect(() => {
     let isMounted = true;
     async function fetchBlockTime() {
       try {
         const provider =
           contract?.runner?.provider ||
-          (contract?.runner && typeof contract.runner.getBlock === "function" ? contract.runner : null);
+          (contract?.runner && typeof contract.runner.getBlock === "function" ? contract.runner : null) ||
+          getReadOnlyProvider();
         if (provider) {
           const b = await provider.getBlock("latest");
           if (b && isMounted) {
@@ -167,10 +190,8 @@ export default function PublicAuditTab({
       }
     }
     fetchBlockTime();
-    const interval = setInterval(fetchBlockTime, 3000);
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
   }, [contract]);
 
@@ -326,7 +347,7 @@ export default function PublicAuditTab({
     return propTenderDetails || null;
   }, [internalSelectedId, selectedTenderId, tenders, sortedTenders, propTenderDetails]);
 
-  // In-flight request concurrency locks (STEP 2)
+  // Concurrency & in-flight locks (STEP 4)
   const inFlightCatalogRef = useRef(false);
   const inFlightDetailsRef = useRef(false);
 
@@ -340,64 +361,103 @@ export default function PublicAuditTab({
   // Is propTenderDetails specifically for active tender?
   const isPropsForActive = Boolean(propTenderDetails && Number(propTenderDetails.id) === activeTenderId);
 
-  // STEP 7: Chunked getLogs helper (ranges of 5000 blocks)
-  const fetchLogsChunked = useCallback(async (provider, filter, fromBlock, toBlock) => {
+  // STEP 3 & 4: Fetch logs from DEPLOY_BLOCK to latestBlock in 5,000 block increments with up to 2 retries per chunk
+  const fetchLogsWithRetries = useCallback(async (provider, filter, fromBlock, toBlock) => {
     const CHUNK_SIZE = 5000;
     const allLogs = [];
     let currentFrom = fromBlock;
 
     while (currentFrom <= toBlock) {
       const currentTo = Math.min(currentFrom + CHUNK_SIZE - 1, toBlock);
-      try {
-        const chunkFilter = {
-          ...filter,
-          fromBlock: currentFrom,
-          toBlock: currentTo,
-        };
-        const chunkLogs = await provider.getLogs(chunkFilter);
-        if (chunkLogs && chunkLogs.length > 0) {
-          allLogs.push(...chunkLogs);
-        }
-      } catch {
-        // If range is still rejected, try half-range fallback
+      const chunkFilter = {
+        ...filter,
+        fromBlock: currentFrom,
+        toBlock: currentTo,
+      };
+
+      let chunkLogs = null;
+      let attempts = 0;
+      while (attempts < 3) {
         try {
-          const mid = Math.floor((currentFrom + currentTo) / 2);
-          const f1 = { ...filter, fromBlock: currentFrom, toBlock: mid };
-          const f2 = { ...filter, fromBlock: mid + 1, toBlock: currentTo };
-          const [l1, l2] = await Promise.all([provider.getLogs(f1), provider.getLogs(f2)]);
-          allLogs.push(...(l1 || []), ...(l2 || []));
-        } catch {
-          // Keep existing list on failure per STEP 7
+          chunkLogs = await provider.getLogs(chunkFilter);
+          break;
+        } catch (err) {
+          attempts++;
+          if (attempts >= 3) {
+            // Half-range fallback as final retry strategy
+            try {
+              const mid = Math.floor((currentFrom + currentTo) / 2);
+              const f1 = { ...filter, fromBlock: currentFrom, toBlock: mid };
+              const f2 = { ...filter, fromBlock: mid + 1, toBlock: currentTo };
+              const [l1, l2] = await Promise.all([provider.getLogs(f1), provider.getLogs(f2)]);
+              chunkLogs = [...(l1 || []), ...(l2 || [])];
+            } catch {
+              chunkLogs = [];
+            }
+          } else {
+            await new Promise((res) => setTimeout(res, 400));
+          }
         }
+      }
+
+      if (chunkLogs && chunkLogs.length > 0) {
+        allLogs.push(...chunkLogs);
       }
       currentFrom = currentTo + 1;
     }
     return allLogs;
   }, []);
 
-  // REFRESH: Catalog & Platform Stats (every 15s per STEP 2)
-  const refreshCatalogAndStats = useCallback(async () => {
-    if (!contract || inFlightCatalogRef.current) return;
+  // STEP 4: performFullDataLoad executes in 3 sequential phases with concurrency <= 3
+  const performFullDataLoad = useCallback(async (forcedTenderId = null) => {
+    if (!contract || isRefreshRunningRef.current) return;
     if (typeof document !== "undefined" && document.hidden) return;
 
-    inFlightCatalogRef.current = true;
+    isRefreshRunningRef.current = true;
+    const targetId = forcedTenderId || activeTenderIdRef.current;
+    let hadError = false;
+
     try {
       const provider =
         contract.runner?.provider ||
-        (contract.runner && typeof contract.runner.getBlock === "function" ? contract.runner : null);
+        (contract.runner && typeof contract.runner.getBlock === "function" ? contract.runner : null) ||
+        getReadOnlyProvider();
 
-      if (provider) {
-        try {
-          const b = await provider.getBlock("latest");
-          if (b && isMountedRef.current) {
-            setBlockTimestamp((prev) => (prev !== Number(b.timestamp) ? Number(b.timestamp) : prev));
-          }
-        } catch {}
-      }
-
-      // Platform stats
+      // ==========================================
+      // PHASE 1: Tenders list & Platform Stats
+      // ==========================================
       try {
-        const stats = await contract.getPlatformStats();
+        const phase1Tasks = [
+          async () => {
+            if (!provider) return null;
+            try {
+              return await provider.getBlock("latest");
+            } catch {
+              return null;
+            }
+          },
+          async () => {
+            try {
+              return await contract.getPlatformStats();
+            } catch {
+              return null;
+            }
+          },
+          async () => {
+            try {
+              return await contract.tenderCount();
+            } catch {
+              return null;
+            }
+          },
+        ];
+
+        const [latestBlockObj, stats, tenderCountBig] = await runWithConcurrencyLimit(phase1Tasks, 3);
+
+        if (latestBlockObj && isMountedRef.current) {
+          setBlockTimestamp((prev) => (prev !== Number(latestBlockObj.timestamp) ? Number(latestBlockObj.timestamp) : prev));
+        }
+
         if (stats && isMountedRef.current) {
           const nextStats = {
             tendersCount: stats[0],
@@ -410,237 +470,209 @@ export default function PublicAuditTab({
           };
           setPlatformStats((prev) => (areDataEqual(prev, nextStats) ? prev : nextStats));
         }
-      } catch {}
 
-      // Tender list
-      let count = 0;
-      try {
-        const countBig = await contract.tenderCount();
-        count = Number(countBig);
-      } catch (err) {
-        throw err;
-      }
-
-      if (count > 0) {
-        const tenderPromises = [];
-        for (let i = 1; i <= count; i++) {
-          tenderPromises.push(contract.getTenderDetails(i).catch(() => null));
-        }
-        const results = await Promise.all(tenderPromises);
-        const loaded = [];
-        for (let i = 0; i < results.length; i++) {
-          const t = results[i];
-          if (t) {
-            loaded.push({
-              id: Number(t.id),
-              department: t.department,
-              ceilingPrice: t.ceilingPrice,
-              bidBond: t.bidBond,
-              commitDeadline: Number(t.commitDeadline),
-              revealDeadline: Number(t.revealDeadline),
-              escrowDeadline: Number(t.escrowDeadline),
-              gracePeriod: Number(t.gracePeriod),
-              completedMilestones: Number(t.completedMilestones),
-              status: Number(t.status),
-              winningBidder: t.winningBidder,
-              winningAmount: t.winningAmount,
-              approvalThreshold: Number(t.approvalThreshold),
-              totalCommits: Number(t.totalCommits),
-              documentHash: t.documentHash,
-            });
-          }
-        }
-        if (loaded.length > 0 && isMountedRef.current) {
-          setTenders((prev) => (areDataEqual(prev, loaded) ? prev : loaded));
-        }
-      }
-
-      // Success: clear reconnecting chip
-      if (isMountedRef.current) {
-        setIsReconnecting(false);
-      }
-    } catch {
-      // STEP 6: If refresh fails, keep old data, show Reconnecting chip, retry in 3s
-      if (isMountedRef.current) {
-        setIsReconnecting(true);
-        if (reconnectRetryTimeoutRef.current) clearTimeout(reconnectRetryTimeoutRef.current);
-        reconnectRetryTimeoutRef.current = setTimeout(() => {
-          refreshCatalogAndStats();
-        }, 3000);
-      }
-    } finally {
-      inFlightCatalogRef.current = false;
-    }
-  }, [contract]);
-
-  // REFRESH: Details for selected tender (bids, stages, activity) every 10s per STEP 2
-  const refreshTenderDetails = useCallback(
-    async (targetTenderId) => {
-      const tenderId = targetTenderId || activeTenderIdRef.current;
-      if (!contract || !tenderId || inFlightDetailsRef.current) return;
-      if (typeof document !== "undefined" && document.hidden) return;
-
-      inFlightDetailsRef.current = true;
-      try {
-        const provider =
-          contract.runner?.provider ||
-          (contract.runner && typeof contract.runner.getBlock === "function" ? contract.runner : null);
-
-        const [d, ms] = await Promise.all([
-          contract.getTenderDetails(tenderId).catch(() => null),
-          contract.getMilestones(tenderId).catch(() => []),
-        ]);
-
-        let rev = [];
-        try {
-          rev = await contract.getRevealedBids(tenderId);
-        } catch {
-          rev = [];
-        }
-
-        let committed = [];
-        try {
-          if (contract.filters?.BidCommitted && typeof contract.queryFilter === "function") {
-            const filter = contract.filters.BidCommitted(tenderId);
-            const latestBlockNum = provider ? await provider.getBlockNumber().catch(() => 0) : 0;
-            const fromBlock = Math.max(0, latestBlockNum - 20000);
-            const evList = await contract.queryFilter(filter, fromBlock);
-            committed = evList.map((e) => ({
-              bidder: e.args?.bidder || e.args?.[1],
-              commitHash: e.args?.commitHash || e.args?.[2],
-              commitTime: e.args?.commitTime || e.args?.[3],
-            }));
-          }
-        } catch {
-          committed = [];
-        }
-
-        // STEP 7: Fetch activity events with getLogs (first load vs incremental)
-        if (provider) {
-          try {
-            const currentBlock = await provider.getBlockNumber();
-            const contractAddr = contract.target || (typeof contract.getAddress === "function" ? await contract.getAddress() : null);
-            if (contractAddr) {
-              let fromBlock = 0;
-              const isFirstEventsLoad = lastSeenBlockRef.current === 0;
-              if (isFirstEventsLoad) {
-                fromBlock = Math.max(0, currentBlock - 5000);
-              } else {
-                fromBlock = lastSeenBlockRef.current + 1;
-              }
-
-              if (fromBlock <= currentBlock) {
-                const logsFilter = {
-                  address: contractAddr,
-                };
-                const rawLogs = await fetchLogsChunked(provider, logsFilter, fromBlock, currentBlock);
-                const iface = contract.interface;
-                const newParsed = [];
-
-                for (let i = 0; i < rawLogs.length; i++) {
-                  try {
-                    const parsed = iface.parseLog(rawLogs[i]);
-                    if (parsed) {
-                      let evTenderId = null;
-                      if (parsed.args) {
-                        if (parsed.args.tenderId !== undefined) {
-                          evTenderId = Number(parsed.args.tenderId);
-                        } else if (
-                          (parsed.name.startsWith("Tender") ||
-                            parsed.name.startsWith("Bid") ||
-                            parsed.name.startsWith("Milestone") ||
-                            parsed.name === "EscrowFunded" ||
-                            parsed.name === "BondRefundClaimed") &&
-                          parsed.args[0] !== undefined
-                        ) {
-                          try {
-                            evTenderId = Number(parsed.args[0]);
-                          } catch {
-                            evTenderId = null;
-                          }
-                        }
-                      }
-
-                      const description =
-                        evTenderId !== null
-                          ? `${parsed.name} on tender #${evTenderId}`
-                          : `${parsed.name} event`;
-
-                      newParsed.push({
-                        name: parsed.name,
-                        tenderId: evTenderId,
-                        description: description,
-                        txHash: rawLogs[i].transactionHash,
-                        logIndex: rawLogs[i].index !== undefined ? rawLogs[i].index : i,
-                        blockNumber: rawLogs[i].blockNumber,
-                        time: "Confirmed",
-                        args: parsed.args,
-                      });
-                    }
-                  } catch {}
-                }
-
-                lastSeenBlockRef.current = currentBlock;
-
-                if (newParsed.length > 0) {
-                  setEvents((prev) => {
-                    const combined = isFirstEventsLoad ? newParsed.reverse() : [...newParsed.reverse(), ...prev];
-                    const seen = new Set();
-                    const deduped = [];
-                    for (const ev of combined) {
-                      const key = `${ev.txHash}-${ev.logIndex ?? 0}`;
-                      if (!seen.has(key)) {
-                        seen.add(key);
-                        deduped.push(ev);
-                      }
-                    }
-                    const capped = deduped.slice(0, 50);
-                    return capped;
-                  });
-                }
+        if (tenderCountBig !== null && tenderCountBig !== undefined) {
+          const count = Number(tenderCountBig);
+          if (count > 0) {
+            const tenderTasks = [];
+            for (let i = 1; i <= count; i++) {
+              tenderTasks.push(() => contract.getTenderDetails(i).catch(() => null));
+            }
+            const tenderResults = await runWithConcurrencyLimit(tenderTasks, 3);
+            const loaded = [];
+            for (let i = 0; i < tenderResults.length; i++) {
+              const t = tenderResults[i];
+              if (t) {
+                loaded.push({
+                  id: Number(t.id),
+                  department: t.department,
+                  ceilingPrice: t.ceilingPrice,
+                  bidBond: t.bidBond,
+                  commitDeadline: Number(t.commitDeadline),
+                  revealDeadline: Number(t.revealDeadline),
+                  escrowDeadline: Number(t.escrowDeadline),
+                  gracePeriod: Number(t.gracePeriod),
+                  completedMilestones: Number(t.completedMilestones),
+                  status: Number(t.status),
+                  winningBidder: t.winningBidder,
+                  winningAmount: t.winningAmount,
+                  approvalThreshold: Number(t.approvalThreshold),
+                  totalCommits: Number(t.totalCommits),
+                  documentHash: t.documentHash,
+                });
               }
             }
-          } catch {
-            // Keep existing events per STEP 7
+            if (loaded.length > 0 && isMountedRef.current) {
+              setTenders((prev) => (areDataEqual(prev, loaded) ? prev : loaded));
+            }
           }
-        }
-
-        // STEP 4 & 5: Cache and state update with deep comparison
-        if (isMountedRef.current && tenderId === activeTenderIdRef.current) {
-          const cacheEntry = {
-            details: d,
-            milestones: ms || [],
-            revealedBids: rev || [],
-            committedBidders: committed || [],
-          };
-          tenderCacheRef.current.set(tenderId, cacheEntry);
-
-          if (d) {
-            setInternalDetails((prev) => (areDataEqual(prev, d) ? prev : d));
-          }
-          setInternalMilestones((prev) => (areDataEqual(prev, ms || []) ? prev : (ms || [])));
-          setInternalRevealedBids((prev) => (areDataEqual(prev, rev || []) ? prev : (rev || [])));
-          setInternalCommittedBidders((prev) => (areDataEqual(prev, committed || []) ? prev : (committed || [])));
-          setIsInternalLoading(false);
-          setIsReconnecting(false);
         }
       } catch {
-        // STEP 6: Keep old data, show Reconnecting chip, retry in 3s
-        if (isMountedRef.current) {
-          setIsReconnecting(true);
-          if (reconnectRetryTimeoutRef.current) clearTimeout(reconnectRetryTimeoutRef.current);
-          reconnectRetryTimeoutRef.current = setTimeout(() => {
-            refreshTenderDetails(tenderId);
-          }, 3000);
-        }
-      } finally {
-        inFlightDetailsRef.current = false;
+        hadError = true;
       }
-    },
-    [contract, fetchLogsChunked]
-  );
 
-  // Initial load & when activeTenderId changes: load from cache immediately or fetch
+      // ==========================================
+      // PHASE 2: Selected Tender Details
+      // ==========================================
+      const selectedIdToFetch = targetId || (sortedTenders.length > 0 ? Number(sortedTenders[0].id) : null);
+      if (selectedIdToFetch && !isPropsForActive) {
+        try {
+          const phase2Tasks = [
+            async () => contract.getTenderDetails(selectedIdToFetch).catch(() => null),
+            async () => contract.getMilestones(selectedIdToFetch).catch(() => []),
+            async () => contract.getRevealedBids(selectedIdToFetch).catch(() => []),
+            async () => {
+              if (contract.filters?.BidCommitted && typeof contract.queryFilter === "function") {
+                const filter = contract.filters.BidCommitted(selectedIdToFetch);
+                const evList = await contract.queryFilter(filter, DEPLOY_BLOCK).catch(() => []);
+                return evList.map((e) => ({
+                  bidder: e.args?.bidder || e.args?.[1],
+                  commitHash: e.args?.commitHash || e.args?.[2],
+                  commitTime: e.args?.commitTime || e.args?.[3],
+                }));
+              }
+              return [];
+            },
+          ];
+
+          const [d, ms, rev, committed] = await runWithConcurrencyLimit(phase2Tasks, 3);
+
+          if (isMountedRef.current && (selectedIdToFetch === activeTenderIdRef.current || !activeTenderIdRef.current)) {
+            const cacheEntry = {
+              details: d,
+              milestones: ms || [],
+              revealedBids: rev || [],
+              committedBidders: committed || [],
+            };
+            tenderCacheRef.current.set(selectedIdToFetch, cacheEntry);
+
+            if (d) {
+              setInternalDetails((prev) => (areDataEqual(prev, d) ? prev : d));
+            }
+            if (ms) {
+              setInternalMilestones((prev) => (areDataEqual(prev, ms) ? prev : ms));
+            }
+            if (rev) {
+              setInternalRevealedBids((prev) => (areDataEqual(prev, rev) ? prev : rev));
+            }
+            if (committed) {
+              setInternalCommittedBidders((prev) => (areDataEqual(prev, committed) ? prev : committed));
+            }
+            setIsInternalLoading(false);
+          }
+        } catch {
+          hadError = true;
+        }
+      }
+
+      // ==========================================
+      // PHASE 3: Activity Logs (Chunked with retries)
+      // ==========================================
+      if (provider) {
+        try {
+          const currentBlock = await provider.getBlockNumber();
+          const contractAddr = contract.target || (typeof contract.getAddress === "function" ? await contract.getAddress() : null);
+          if (contractAddr && currentBlock) {
+            const isFirstEventsLoad = lastSeenBlockRef.current === 0;
+            const fromBlock = isFirstEventsLoad ? DEPLOY_BLOCK : lastSeenBlockRef.current + 1;
+
+            if (fromBlock <= currentBlock) {
+              const logsFilter = { address: contractAddr };
+              const rawLogs = await fetchLogsWithRetries(provider, logsFilter, fromBlock, currentBlock);
+              const iface = contract.interface;
+              const newParsed = [];
+
+              for (let i = 0; i < rawLogs.length; i++) {
+                try {
+                  const parsed = iface.parseLog(rawLogs[i]);
+                  if (parsed) {
+                    let evTenderId = null;
+                    if (parsed.args) {
+                      if (parsed.args.tenderId !== undefined) {
+                        evTenderId = Number(parsed.args.tenderId);
+                      } else if (
+                        (parsed.name.startsWith("Tender") ||
+                          parsed.name.startsWith("Bid") ||
+                          parsed.name.startsWith("Milestone") ||
+                          parsed.name === "EscrowFunded" ||
+                          parsed.name === "BondRefundClaimed") &&
+                        parsed.args[0] !== undefined
+                      ) {
+                        try {
+                          evTenderId = Number(parsed.args[0]);
+                        } catch {
+                          evTenderId = null;
+                        }
+                      }
+                    }
+
+                    const description =
+                      evTenderId !== null
+                        ? `${parsed.name} on tender #${evTenderId}`
+                        : `${parsed.name} event`;
+
+                    newParsed.push({
+                      name: parsed.name,
+                      tenderId: evTenderId,
+                      description: description,
+                      txHash: rawLogs[i].transactionHash,
+                      logIndex: rawLogs[i].index !== undefined ? rawLogs[i].index : i,
+                      blockNumber: rawLogs[i].blockNumber,
+                      time: "Confirmed",
+                      args: parsed.args,
+                    });
+                  }
+                } catch {}
+              }
+
+              lastSeenBlockRef.current = currentBlock;
+
+              if (newParsed.length > 0 && isMountedRef.current) {
+                setEvents((prev) => {
+                  const combined = isFirstEventsLoad ? newParsed.reverse() : [...newParsed.reverse(), ...prev];
+                  const seen = new Set();
+                  const deduped = [];
+                  for (const ev of combined) {
+                    const key = `${ev.txHash}-${ev.logIndex ?? 0}`;
+                    if (!seen.has(key)) {
+                      seen.add(key);
+                      deduped.push(ev);
+                    }
+                  }
+                  return deduped.slice(0, 50);
+                });
+              }
+            }
+          }
+        } catch {
+          hadError = true;
+        }
+      }
+
+      if (isMountedRef.current) {
+        if (hadError) {
+          setRefreshErrorChip(true);
+        } else {
+          setRefreshErrorChip(false);
+          const d = new Date();
+          setLastUpdatedTime(d.toTimeString().split(" ")[0]);
+        }
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setRefreshErrorChip(true);
+      }
+    } finally {
+      isRefreshRunningRef.current = false;
+    }
+  }, [contract, fetchLogsWithRetries, sortedTenders]);
+
+  // STEP 1(a): Load once when the page opens
+  useEffect(() => {
+    performFullDataLoad();
+  }, [performFullDataLoad]);
+
+  // STEP 1(b) & STEP 4: When user selects a tender, restore cached immediately and load in background
   useEffect(() => {
     if (!activeTenderId) return;
 
@@ -652,7 +684,6 @@ export default function PublicAuditTab({
       if (cached.committedBidders) setInternalCommittedBidders(cached.committedBidders);
       setIsInternalLoading(false);
     } else if (!isPropsForActive) {
-      // Clear previous tender's internal data so it does not leak into the new tender
       setInternalDetails(null);
       setInternalMilestones(null);
       setInternalRevealedBids(null);
@@ -660,66 +691,73 @@ export default function PublicAuditTab({
       setIsInternalLoading(true);
     }
 
-    if (!isPropsForActive) {
-      refreshTenderDetails(activeTenderId);
-    }
-  }, [activeTenderId, isPropsForActive, refreshTenderDetails]);
+    performFullDataLoad(activeTenderId);
+  }, [activeTenderId, isPropsForActive, performFullDataLoad]);
 
-  // STEP 2: Polling intervals & Page Visibility API
+  // STEP 1(e): Trigger refresh once when a countdown reaches zero
+  const countdownZeroTriggeredRef = useRef(new Set());
   useEffect(() => {
-    refreshCatalogAndStats();
+    if (!activeTender || !blockTimestamp) return;
+    const tId = Number(activeTender.id);
+    const commitPassed = blockTimestamp >= Number(activeTender.commitDeadline);
+    const revealPassed = blockTimestamp >= Number(activeTender.revealDeadline);
 
-    // 15-second interval for catalog & stats
-    const catalogInterval = setInterval(() => {
-      refreshCatalogAndStats();
-    }, 15000);
+    const commitKey = `${tId}-commit-zero`;
+    const revealKey = `${tId}-reveal-zero`;
 
-    // 10-second interval for selected tender details
-    const detailsInterval = setInterval(() => {
-      refreshTenderDetails(activeTenderIdRef.current);
-    }, 10000);
+    if (commitPassed && !countdownZeroTriggeredRef.current.has(commitKey)) {
+      countdownZeroTriggeredRef.current.add(commitKey);
+      performFullDataLoad(tId);
+    } else if (revealPassed && !countdownZeroTriggeredRef.current.has(revealKey)) {
+      countdownZeroTriggeredRef.current.add(revealKey);
+      performFullDataLoad(tId);
+    }
+  }, [activeTender, blockTimestamp, performFullDataLoad]);
 
-    // Pause all polling when document.hidden is true; refresh once when visible again
-    const handleVisibilityChange = () => {
-      if (typeof document !== "undefined" && !document.hidden) {
-        refreshCatalogAndStats();
-        if (activeTenderIdRef.current) {
-          refreshTenderDetails(activeTenderIdRef.current);
-        }
+  // STEP 1: Optional slow refresh every 45 seconds (ONLY when tab is visible and no request running)
+  useEffect(() => {
+    const slowInterval = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden && !isRefreshRunningRef.current) {
+        performFullDataLoad();
+      }
+    }, 45000);
+
+    const handleVisibility = () => {
+      if (typeof document !== "undefined" && !document.hidden && !isRefreshRunningRef.current) {
+        performFullDataLoad();
       }
     };
 
     if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", handleVisibilityChange);
+      document.addEventListener("visibilitychange", handleVisibility);
     }
 
     return () => {
-      clearInterval(catalogInterval);
-      clearInterval(detailsInterval);
+      clearInterval(slowInterval);
       if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        document.removeEventListener("visibilitychange", handleVisibility);
       }
     };
-  }, [refreshCatalogAndStats, refreshTenderDetails]);
+  }, [performFullDataLoad]);
 
   // STEP 3: Fallback resolution - NEVER clear data during a refresh
   const effectiveMilestones = isPropsForActive
     ? propMilestones
     : internalMilestones !== null
     ? internalMilestones
-    : propMilestones;
+    : [];
 
   const effectiveRevealedBids = isPropsForActive
     ? propRevealedBids
     : internalRevealedBids !== null
     ? internalRevealedBids
-    : propRevealedBids;
+    : [];
 
   const effectiveCommittedBidders = isPropsForActive
     ? propCommittedBidders
     : internalCommittedBidders !== null
     ? internalCommittedBidders
-    : propCommittedBidders;
+    : [];
 
   const effectiveTenderDetails = isPropsForActive
     ? propTenderDetails
@@ -1204,26 +1242,31 @@ export default function PublicAuditTab({
         <aside className="tenders-list-col" aria-label="Tenders Catalog">
           <div className="section-header-clean">
             <h2 className="section-title-clean">Tenders</h2>
-            {/* STEP 6: Small Reconnecting... chip near page title */}
-            {isReconnecting && (
-              <span
-                className="reconnecting-chip font-mono"
-                role="status"
-                aria-live="polite"
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "2px 8px",
-                  borderRadius: "4px",
-                  backgroundColor: "rgba(234, 179, 8, 0.15)",
-                  color: "#eab308",
-                  border: "1px solid rgba(234, 179, 8, 0.3)",
-                  marginLeft: "auto",
-                  fontWeight: 600,
-                }}
+            <div className="tenders-header-actions">
+              <button
+                type="button"
+                className="btn-clean-refresh font-mono"
+                onClick={() => performFullDataLoad()}
+                disabled={isRefreshRunningRef.current}
+                title="Refresh Tenders and Activity"
               >
-                Reconnecting...
-              </span>
-            )}
+                🔄 Refresh
+              </button>
+              {lastUpdatedTime && (
+                <span className="last-updated-text font-mono">
+                  Last updated {lastUpdatedTime}
+                </span>
+              )}
+              {refreshErrorChip && (
+                <span
+                  className="refresh-error-chip font-mono"
+                  role="status"
+                  aria-live="polite"
+                >
+                  Could not refresh, showing last data
+                </span>
+              )}
+            </div>
           </div>
 
           {tenders.length === 0 ? (

@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import OpenTenderABIJson from "./abi/OpenTenderABI.json";
 
 export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x493Bb88ad309346aA84E237aC84c8612eD1852d8";
+export const DEPLOY_BLOCK = parseInt(import.meta.env.VITE_DEPLOY_BLOCK || "6681138", 10);
 export const RPC_URL = import.meta.env.VITE_RPC_URL || "https://testnetrpc.mstblockchain.com";
 export const CHAIN_ID = parseInt(import.meta.env.VITE_CHAIN_ID || "91562037", 10);
 export const CHAIN_NAME = import.meta.env.VITE_CHAIN_NAME || "MST Testnet";
@@ -13,13 +14,17 @@ export const DEMO_VERIFIERS =
 
 export const OpenTenderABI = OpenTenderABIJson;
 
-// Read-only provider for public audit tab (requires zero wallet connection)
+// Shared singleton read-only provider for public audit tab (STEP 4)
+let _sharedProvider = null;
 export function getReadOnlyProvider() {
-  return new ethers.JsonRpcProvider(
-    RPC_URL,
-    { chainId: CHAIN_ID, name: CHAIN_NAME },
-    { staticNetwork: true }
-  );
+  if (!_sharedProvider) {
+    _sharedProvider = new ethers.JsonRpcProvider(
+      RPC_URL,
+      { chainId: CHAIN_ID, name: CHAIN_NAME },
+      { staticNetwork: true }
+    );
+  }
+  return _sharedProvider;
 }
 
 export function getReadOnlyContract() {

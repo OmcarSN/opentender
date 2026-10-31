@@ -4890,3 +4890,53 @@ details[open] .details-chevron {
   background: var(--border-subtle);
   margin: 0.25rem 0;
 }
+
+/* STEP 1 & 5: Refresh controls in Tenders section header */
+.tenders-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.btn-clean-refresh {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-clean-refresh:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.btn-clean-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.last-updated-text {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.refresh-error-chip {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  font-weight: 600;
+}

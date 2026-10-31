@@ -243,17 +243,17 @@ export default function App() {
             commitHash: e.args.commitHash || e.args[2],
             commitTime: e.args.commitTime || e.args[3],
           }));
-          setCommittedBidders(bList);
+          setCommittedBidders((prev) => (bList && bList.length > 0 ? bList : prev));
         } catch {
-          setCommittedBidders([]);
+          // Keep previous bidders on RPC error, never wipe to empty
         }
 
         // Try reading revealed bids if phase ended
         try {
           const rev = await readContract.getRevealedBids(targetId);
-          setRevealedBids(rev);
+          setRevealedBids((prev) => (rev && rev.length > 0 ? rev : prev));
         } catch {
-          setRevealedBids([]);
+          // Keep previous revealed bids on error
         }
       }
 
@@ -493,8 +493,6 @@ export default function App() {
 
   useEffect(() => {
     loadContractData();
-    const interval = setInterval(loadContractData, 8000);
-    return () => clearInterval(interval);
   }, [loadContractData]);
 
   const signerContract = signer ? getSignerContract(signer) : null;
