@@ -867,6 +867,28 @@ export default function PublicAuditTab({
               })}
             </div>
           )}
+
+          {/* Meaningful Verification Guarantees Box to enrich left column and eliminate empty space */}
+          <div className="tender-list-guarantees-card">
+            <div className="guarantees-card-header">
+              <span className="guarantees-card-icon">🛡️</span>
+              <span className="guarantees-card-title">Protocol Invariants</span>
+            </div>
+            <ul className="guarantees-card-list">
+              <li>
+                <strong>Sealed Bids:</strong> Hashes locked in contract until reveal time. Insiders cannot peek.
+              </li>
+              <li>
+                <strong>Rule of Law:</strong> Contract awards lowest valid bidder without administrative discretion.
+              </li>
+              <li>
+                <strong>Escrow Bound:</strong> Funds locked on-chain before contractor begins work.
+              </li>
+              <li>
+                <strong>Independent Signoff:</strong> Multilateral verifier approval required for payouts.
+              </li>
+            </ul>
+          </div>
         </aside>
 
         {/* Right Column: Selected Tender Details */}

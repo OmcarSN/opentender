@@ -3580,9 +3580,21 @@ input[type="file"]::file-selector-button:hover {
     align-items: start;
   }
 
-  .tenders-detail-col {
+  .tenders-list-col {
     position: sticky;
     top: 24px;
+    align-self: start;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .tenders-list-col::-webkit-scrollbar {
+    width: 4px;
+  }
+  .tenders-list-col::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
   }
 }
 
@@ -3595,6 +3607,51 @@ input[type="file"]::file-selector-button:hover {
 
 .tenders-detail-col {
   min-width: 0;
+}
+
+/* Guarantees Box in Left Column */
+.tender-list-guarantees-card {
+  background: linear-gradient(180deg, rgba(20, 184, 166, 0.04) 0%, rgba(0, 0, 0, 0.25) 100%), var(--bg-card);
+  border: 1px solid rgba(20, 184, 166, 0.2);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.guarantees-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.guarantees-card-icon {
+  font-size: 1.1rem;
+}
+
+.guarantees-card-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #5eead4;
+  letter-spacing: -0.01em;
+}
+
+.guarantees-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.guarantees-card-list li strong {
+  color: #ffffff;
 }
 
 /* Tender Deadlines Bar */
