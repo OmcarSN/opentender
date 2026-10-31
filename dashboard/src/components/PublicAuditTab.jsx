@@ -831,22 +831,23 @@ export default function PublicAuditTab({
       <section className="audit-section" aria-label="Tenders Catalog">
         <div className="section-header-clean" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", marginBottom: "1rem" }}>
           <h2 className="section-title-clean" style={{ margin: 0 }}>Tenders</h2>
-          <div className="audit-filters-bar" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-            <input
-              type="text"
-              className="audit-search-input"
-              placeholder="Search tenders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Search tenders"
-              style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: "0.82rem" }}
-            />
+          <div className="audit-filters-bar">
+            <div className="audit-search-wrap">
+              <span className="audit-search-icon" aria-hidden="true">🔍</span>
+              <input
+                type="text"
+                className="audit-search-input"
+                placeholder="Search tenders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search tenders"
+              />
+            </div>
             <select
               className="audit-category-select"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               aria-label="Category filter"
-              style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", background: "#111827", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: "0.82rem" }}
             >
               <option value="all">All Categories</option>
               <option value="infrastructure">Infrastructure</option>
@@ -861,7 +862,6 @@ export default function PublicAuditTab({
               value={procurementFilter}
               onChange={(e) => setProcurementFilter(e.target.value)}
               aria-label="Procurement filter"
-              style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", background: "#111827", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: "0.82rem" }}
             >
               <option value="all">All Procurement</option>
               <option value="open">Open Tendering</option>
@@ -878,7 +878,6 @@ export default function PublicAuditTab({
                   setCategoryFilter("all");
                   setProcurementFilter("all");
                 }}
-                style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", cursor: "pointer", fontSize: "0.82rem" }}
               >
                 Reset Filters
               </button>
@@ -907,7 +906,6 @@ export default function PublicAuditTab({
                 setCategoryFilter("all");
                 setProcurementFilter("all");
               }}
-              style={{ marginTop: "0.5rem", padding: "0.4rem 0.75rem", borderRadius: "6px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", cursor: "pointer", fontSize: "0.82rem" }}
             >
               Reset Filters
             </button>
