@@ -278,6 +278,39 @@ export default function OfficerTab({
     );
   }, [account, tenders]);
 
+  // STEP 3: Split into Active (not Completed 4, Failed 5, Cancelled 6, Defaulted 7) and Past tenders
+  const { activeDeptTenders, pastDeptTenders } = useMemo(() => {
+    const sorted = [...myTenders].sort((a, b) => Number(b.id) - Number(a.id));
+    const active = [];
+    const past = [];
+    for (const t of sorted) {
+      const st = Number(t.status);
+      if (st === 4 || st === 5 || st === 6 || st === 7) {
+        past.push(t);
+      } else {
+        active.push(t);
+      }
+    }
+    return { activeDeptTenders: active, pastDeptTenders: past };
+  }, [myTenders]);
+
+  const [showAllDeptTenders, setShowAllDeptTenders] = useState(false);
+  const [isPastTendersOpen, setIsPastTendersOpen] = useState(false);
+
+  // STEP 4: Show only the 8 newest tenders by default across active and past
+  const visibleActiveTenders = useMemo(() => {
+    if (showAllDeptTenders) return activeDeptTenders;
+    return activeDeptTenders.slice(0, 8);
+  }, [activeDeptTenders, showAllDeptTenders]);
+
+  const visiblePastTenders = useMemo(() => {
+    if (showAllDeptTenders) return pastDeptTenders;
+    const remainingSlots = Math.max(0, 8 - activeDeptTenders.length);
+    return pastDeptTenders.slice(0, remainingSlots);
+  }, [pastDeptTenders, activeDeptTenders.length, showAllDeptTenders]);
+
+  const totalMyTendersCount = activeDeptTenders.length + pastDeptTenders.length;
+
   const [tenderMilestonesMap, setTenderMilestonesMap] = useState({});
 
   useEffect(() => {
@@ -886,8 +919,8 @@ export default function OfficerTab({
       {/* 1. Department Section (Kept unchanged)                             */}
       {/* ================================================================= */}
       <div className="officer-grid">
-        {/* Panel 1: Department: publish a tender */}
-        <div className="panel">
+        {/* Panel 1: Department: publish a tender (Sticky left column) */}
+        <div className="panel officer-publish-col">
           <div className="panel-header">
             <div>
               <h3>Department: publish a tender</h3>
@@ -1239,57 +1272,137 @@ export default function OfficerTab({
               </div>
             </div>
           ) : (
-            <div className="my-tenders-list">
-              {myTenders.map((t) => {
-                const statusInfo = getTenderStatus(t, currentBlockTime);
-                const tenderTitle = getTenderTitle(t);
-                const nextAction = getNextAction(t, currentBlockTime, tenderMilestonesMap[t.id] || []);
-                const isThisSubmitting = isSubmitting && submittingTenderId === t.id;
+            <div className="my-tenders-scrollbox">
+              {/* (a) Active tenders: newest first */}
+              {visibleActiveTenders.length > 0 ? (
+                <div className="my-tenders-list">
+                  {visibleActiveTenders.map((t) => {
+                    const statusInfo = getTenderStatus(t, currentBlockTime);
+                    const tenderTitle = getTenderTitle(t);
+                    const nextAction = getNextAction(t, currentBlockTime, tenderMilestonesMap[t.id] || []);
+                    const isThisSubmitting = isSubmitting && submittingTenderId === t.id;
 
-                return (
-                  <div key={t.id} className="my-tender-card">
-                    <div className="my-tender-header">
-                      <div>
-                        <h4 className="my-tender-title">
-                          Tender #{t.id} {tenderTitle ? `— "${tenderTitle}"` : `(${t.documentHash ? t.documentHash.slice(0, 10) : ""})`}
-                        </h4>
-                        <div className="my-tender-status-row">
-                          <span className="my-tender-status-badge">
-                            {statusInfo.label}
-                          </span>
-                          {statusInfo.countdown && (
-                            <span className="my-tender-countdown highlight-timer">
-                              {statusInfo.countdown}
-                            </span>
-                          )}
+                    return (
+                      <div key={t.id} className="my-tender-card">
+                        <div className="my-tender-header">
+                          <div>
+                            <h4 className="my-tender-title">
+                              Tender #{t.id} {tenderTitle ? `— "${tenderTitle}"` : `(${t.documentHash ? t.documentHash.slice(0, 10) : ""})`}
+                            </h4>
+                            <div className="my-tender-status-row">
+                              <span className="my-tender-status-badge">
+                                {statusInfo.label}
+                              </span>
+                              {statusInfo.countdown && (
+                                <span className="my-tender-countdown highlight-timer">
+                                  {statusInfo.countdown}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="my-tender-meta">
+                            <div>
+                              Max: <strong>{ethers.formatEther(t.ceilingPrice)} {CURRENCY_SYMBOL}</strong>
+                            </div>
+                            <div>
+                              Deposit: <strong>{ethers.formatEther(t.bidBond)} {CURRENCY_SYMBOL}</strong>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="my-tender-meta">
-                        <div>
-                          Max: <strong>{ethers.formatEther(t.ceilingPrice)} {CURRENCY_SYMBOL}</strong>
-                        </div>
-                        <div>
-                          Deposit: <strong>{ethers.formatEther(t.bidBond)} {CURRENCY_SYMBOL}</strong>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="my-tender-action-box">
-                      <div className="action-description">
-                        {nextAction.description}
+                        <div className="my-tender-action-box">
+                          <div className="action-description">
+                            {nextAction.description}
+                          </div>
+                          <button
+                            type="button"
+                            className={`btn btn-block ${nextAction.buttonClass || "btn-primary"}`}
+                            disabled={nextAction.disabled || isThisSubmitting || isWrongNetwork}
+                            onClick={nextAction.action || undefined}
+                          >
+                            {isThisSubmitting ? "Processing action..." : nextAction.buttonText}
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        className={`btn btn-block ${nextAction.buttonClass || "btn-primary"}`}
-                        disabled={nextAction.disabled || isThisSubmitting || isWrongNetwork}
-                        onClick={nextAction.action || undefined}
-                      >
-                        {isThisSubmitting ? "Processing action..." : nextAction.buttonText}
-                      </button>
-                    </div>
+                    );
+                  })}
+                </div>
+              ) : pastDeptTenders.length === 0 ? (
+                <div className="empty-tender-notice">No active tenders found.</div>
+              ) : null}
+
+              {/* (b) Past tenders: collapsed section titled "Past tenders (N)" */}
+              {pastDeptTenders.length > 0 && (
+                <details
+                  className="past-tenders-accordion"
+                  open={isPastTendersOpen}
+                  onToggle={(e) => setIsPastTendersOpen(e.currentTarget.open)}
+                >
+                  <summary className="past-tenders-summary">
+                    Past tenders ({pastDeptTenders.length})
+                  </summary>
+                  <div className="past-tenders-content">
+                    {visiblePastTenders.map((t) => {
+                      const statusInfo = getTenderStatus(t, currentBlockTime);
+                      const tenderTitle = getTenderTitle(t);
+                      const nextAction = getNextAction(t, currentBlockTime, tenderMilestonesMap[t.id] || []);
+                      const isThisSubmitting = isSubmitting && submittingTenderId === t.id;
+
+                      return (
+                        <div key={t.id} className="my-tender-card">
+                          <div className="my-tender-header">
+                            <div>
+                              <h4 className="my-tender-title">
+                                Tender #{t.id} {tenderTitle ? `— "${tenderTitle}"` : `(${t.documentHash ? t.documentHash.slice(0, 10) : ""})`}
+                              </h4>
+                              <div className="my-tender-status-row">
+                                <span className="my-tender-status-badge">
+                                  {statusInfo.label}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="my-tender-meta">
+                              <div>
+                                Max: <strong>{ethers.formatEther(t.ceilingPrice)} {CURRENCY_SYMBOL}</strong>
+                              </div>
+                              <div>
+                                Deposit: <strong>{ethers.formatEther(t.bidBond)} {CURRENCY_SYMBOL}</strong>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="my-tender-action-box">
+                            <div className="action-description">
+                              {nextAction.description}
+                            </div>
+                            <button
+                              type="button"
+                              className={`btn btn-block ${nextAction.buttonClass || "btn-secondary"}`}
+                              disabled={nextAction.disabled || isThisSubmitting || isWrongNetwork}
+                              onClick={nextAction.action || undefined}
+                            >
+                              {isThisSubmitting ? "Processing action..." : nextAction.buttonText}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </details>
+              )}
+
+              {/* STEP 4: "Show older tenders" toggle if more than 8 tenders exist */}
+              {totalMyTendersCount > 8 && (
+                <button
+                  type="button"
+                  className="btn-show-older font-mono"
+                  onClick={() => setShowAllDeptTenders((prev) => !prev)}
+                >
+                  {showAllDeptTenders
+                    ? "Show fewer tenders"
+                    : `Show older tenders (${totalMyTendersCount - 8} more)`}
+                </button>
+              )}
             </div>
           )}
         </div>

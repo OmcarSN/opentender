@@ -88,6 +88,8 @@ export default function PublicAuditTab({
 
   // Internal reactive state to ensure seamless background polling without clearing
   const [tenders, setTenders] = useState(propTenders || []);
+  const [showAllTenders, setShowAllTenders] = useState(false);
+  const selectedCardRef = useRef(null);
   const [platformStats, setPlatformStats] = useState(propPlatformStats || null);
   const [events, setEvents] = useState(propEvents || []);
 
@@ -335,6 +337,12 @@ export default function PublicAuditTab({
   const sortedTenders = useMemo(() => {
     return [...tenders].sort((a, b) => Number(b.id) - Number(a.id));
   }, [tenders]);
+
+  // STEP 4: Show only the 8 newest tenders by default with reveal toggle
+  const visibleTenders = useMemo(() => {
+    if (showAllTenders || sortedTenders.length <= 8) return sortedTenders;
+    return sortedTenders.slice(0, 8);
+  }, [sortedTenders, showAllTenders]);
 
   // Active tender object
   const activeTender = useMemo(() => {
@@ -739,6 +747,13 @@ export default function PublicAuditTab({
       }
     };
   }, [performFullDataLoad]);
+
+  // STEP 1: Scroll selected card into view inside the left list box
+  useEffect(() => {
+    if (selectedCardRef.current && typeof selectedCardRef.current.scrollIntoView === "function") {
+      selectedCardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [activeTenderId]);
 
   // STEP 3: Fallback resolution - NEVER clear data during a refresh
   const effectiveMilestones = isPropsForActive
@@ -1280,55 +1295,67 @@ export default function PublicAuditTab({
               </p>
             </div>
           ) : (
-            <div className="tender-cards-list">
-              {sortedTenders.map((t) => {
-                const statusInfo = getTenderStatus(t, blockTimestamp);
-                const isSelected = activeTender && Number(activeTender.id) === Number(t.id);
-                const maxPriceFormatted = `${fmtAmount(t.ceilingPrice)} ${CURRENCY_SYMBOL}`;
-                const depositFormatted = `${fmtAmount(t.bidBond)} ${CURRENCY_SYMBOL}`;
+            <>
+              <div className="tender-cards-list">
+                {visibleTenders.map((t) => {
+                  const statusInfo = getTenderStatus(t, blockTimestamp);
+                  const isSelected = activeTender && Number(activeTender.id) === Number(t.id);
+                  const maxPriceFormatted = `${fmtAmount(t.ceilingPrice)} ${CURRENCY_SYMBOL}`;
+                  const depositFormatted = `${fmtAmount(t.bidBond)} ${CURRENCY_SYMBOL}`;
 
-                return (
-                  <div
-                    key={t.id}
-                    className={`tender-summary-card ${isSelected ? "selected" : ""}`}
-                    onClick={() => handleSelectTender(t.id)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleSelectTender(t.id);
-                      }
-                    }}
-                    style={{ cursor: "pointer" }}
-                    aria-label={`Select Tender #${t.id}`}
-                  >
-                    <div className="tender-card-header">
-                      <span className="tender-card-title">{getTenderHeading(t.id)}</span>
-                      <span className="tender-card-status">{statusInfo.label}</span>
+                  return (
+                    <div
+                      key={t.id}
+                      ref={isSelected ? selectedCardRef : null}
+                      className={`tender-summary-card ${isSelected ? "selected" : ""}`}
+                      onClick={() => handleSelectTender(t.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleSelectTender(t.id);
+                        }
+                      }}
+                      style={{ cursor: "pointer" }}
+                      aria-label={`Select Tender #${t.id}`}
+                    >
+                      <div className="tender-card-header">
+                        <span className="tender-card-title">{getTenderHeading(t.id)}</span>
+                        <span className="tender-card-status">{statusInfo.label}</span>
+                      </div>
+
+                      {statusInfo.countdown && (
+                        <div className="tender-card-countdown">
+                          <span className="countdown-label">Time remaining:</span>{" "}
+                          <span className="countdown-val font-mono">{statusInfo.countdown}</span>
+                        </div>
+                      )}
+
+                      <div className="tender-card-financials">
+                        <div className="fin-item">
+                          <span className="fin-label">Max price:</span>
+                          <span className="fin-val font-mono">{maxPriceFormatted}</span>
+                        </div>
+                        <div className="fin-item">
+                          <span className="fin-label">Deposit:</span>
+                          <span className="fin-val font-mono">{depositFormatted}</span>
+                        </div>
+                      </div>
                     </div>
-
-                    {statusInfo.countdown && (
-                      <div className="tender-card-countdown">
-                        <span className="countdown-label">Time remaining:</span>{" "}
-                        <span className="countdown-val font-mono">{statusInfo.countdown}</span>
-                      </div>
-                    )}
-
-                    <div className="tender-card-financials">
-                      <div className="fin-item">
-                        <span className="fin-label">Max price:</span>
-                        <span className="fin-val font-mono">{maxPriceFormatted}</span>
-                      </div>
-                      <div className="fin-item">
-                        <span className="fin-label">Deposit:</span>
-                        <span className="fin-val font-mono">{depositFormatted}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              {sortedTenders.length > 8 && (
+                <button
+                  type="button"
+                  className="btn-show-older font-mono"
+                  onClick={() => setShowAllTenders((prev) => !prev)}
+                >
+                  {showAllTenders ? "Show fewer tenders" : `Show older tenders (${sortedTenders.length - 8} more)`}
+                </button>
+              )}
+            </>
           )}
         </aside>
 
