@@ -1762,7 +1762,7 @@ header, nav, nav a, button, .tab, .pill {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 1.75rem;
-  align-items: stretch; /* Cards stretch to equal height across columns */
+  align-items: start;
 }
 
 .panel {
@@ -1775,7 +1775,6 @@ header, nav, nav a, button, .tab, .pill {
   container-type: inline-size;
   container-name: panel;
   box-sizing: border-box;
-  height: 100%;
 }
 
 .panel-header {
@@ -1785,7 +1784,6 @@ header, nav, nav a, button, .tab, .pill {
   margin-bottom: 1.25rem;
   padding-bottom: 0.85rem;
   border-bottom: 1px solid var(--border-subtle);
-  min-height: 68px;
   box-sizing: border-box;
 }
 
@@ -1817,12 +1815,11 @@ header, nav, nav a, button, .tab, .pill {
   display: flex;
   flex-direction: column;
   gap: 1.15rem;
-  flex: 1;
 }
 
 .form-card .action-button-row {
-  margin-top: auto;
-  padding-top: 1rem;
+  margin-top: 0;
+  padding-top: 0.75rem;
 }
 
 .form-group {
