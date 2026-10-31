@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ethers } from "ethers";
 import { CURRENCY_SYMBOL, EXPLORER_URL, CHAIN_NAME } from "../config";
+import { fmtAmount, fmtDateTime } from "../utils/format";
 
 export default function PublicAuditTab({
   contract,
@@ -65,9 +66,6 @@ export default function PublicAuditTab({
   const [cheatTesting, setCheatTesting] = useState(false);
   const [testAResult, setTestAResult] = useState(null);
   const [testBResult, setTestBResult] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [procurementFilter, setProcurementFilter] = useState("all");
 
   // Escape key handler to close cheat modal
   useEffect(() => {
@@ -244,37 +242,10 @@ export default function PublicAuditTab({
     return `Tender #${id}${snippet ? ` ${snippet}` : ""}`;
   }
 
-  // Sorted and filtered tenders
-  // Sorted and filtered tenders
+  // Sorted tenders (newest first)
   const sortedTenders = useMemo(() => {
-    let list = [...tenders];
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter((t) => {
-        const heading = getTenderHeading(t.id).toLowerCase();
-        const idMatch = String(t.id).includes(q);
-        const docMatch = (t.documentHash || tenderDocHashes[t.id] || "").toLowerCase().includes(q);
-        const catMatch = (t.category || "").toLowerCase().includes(q);
-        const depMatch = (t.department || "").toLowerCase().includes(q);
-        const titleMatch = (t.title || "").toLowerCase().includes(q);
-        const descMatch = (t.description || "").toLowerCase().includes(q);
-        const methodMatch = (t.procurementScale || t.scale || t.procurementMethod || "").toLowerCase().includes(q);
-        const statusInfo = getTenderStatus(t, blockTimestamp);
-        const statusMatch = (statusInfo.label || "").toLowerCase().includes(q);
-        return heading.includes(q) || idMatch || docMatch || catMatch || depMatch || titleMatch || descMatch || methodMatch || statusMatch;
-      });
-    }
-    if (categoryFilter !== "all") {
-      list = list.filter((t) => (t.category || "").toLowerCase() === categoryFilter.toLowerCase());
-    }
-    if (procurementFilter !== "all") {
-      list = list.filter((t) => {
-        const method = (t.procurementScale || t.scale || t.procurementMethod || "").toLowerCase();
-        return method === procurementFilter.toLowerCase();
-      });
-    }
-    return list.sort((a, b) => Number(b.id) - Number(a.id));
-  }, [tenders, searchQuery, categoryFilter, procurementFilter, tenderDocHashes, tenderDetails, blockTimestamp]);
+    return [...tenders].sort((a, b) => Number(b.id) - Number(a.id));
+  }, [tenders]);
 
   // Active tender object
   const activeTender = useMemo(() => {
@@ -814,7 +785,7 @@ export default function PublicAuditTab({
               : isDataLoading && !platformStats
               ? "..."
               : platformStats?.tvl !== undefined
-              ? `${parseFloat(ethers.formatEther(platformStats.tvl)).toFixed(2)} ${CURRENCY_SYMBOL}`
+              ? `${fmtAmount(platformStats.tvl)} ${CURRENCY_SYMBOL}`
               : "-"}
           </span>
         </div>
@@ -827,389 +798,326 @@ export default function PublicAuditTab({
         </div>
       </section>
 
-      {/* STEP 3: Tender list (one card per tender, newest first) */}
-      <section className="audit-section" aria-label="Tenders Catalog">
-        <div className="section-header-clean" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", marginBottom: "1rem" }}>
-          <h2 className="section-title-clean" style={{ margin: 0 }}>Tenders</h2>
-          <div className="audit-filters-bar">
-            <div className="audit-search-wrap">
-              <span className="audit-search-icon" aria-hidden="true">🔍</span>
-              <input
-                type="text"
-                className="audit-search-input"
-                placeholder="Search tenders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search tenders"
-              />
+      {/* Main Layout: 2-column on >=1100px, 1-column below */}
+      <div className="tenders-main-layout">
+        {/* Left Column (360px on >=1100px): Tender List */}
+        <aside className="tenders-list-col" aria-label="Tenders Catalog">
+          <div className="section-header-clean">
+            <h2 className="section-title-clean">Tenders</h2>
+          </div>
+
+          {tenders.length === 0 ? (
+            <div className="empty-state-clean">
+              <p>
+                {dataLoadError
+                  ? "Unable to load tenders due to connection error."
+                  : isDataLoading
+                  ? "Loading tenders from blockchain..."
+                  : "No tenders yet"}
+              </p>
             </div>
-            <select
-              className="audit-category-select"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              aria-label="Category filter"
-            >
-              <option value="all">All Categories</option>
-              <option value="infrastructure">Infrastructure</option>
-              <option value="technology">Technology</option>
-              <option value="services">Services</option>
-              <option value="energy">Energy</option>
-              <option value="works">Works</option>
-              <option value="goods">Goods</option>
-            </select>
-            <select
-              className="audit-procurement-select"
-              value={procurementFilter}
-              onChange={(e) => setProcurementFilter(e.target.value)}
-              aria-label="Procurement filter"
-            >
-              <option value="all">All Procurement</option>
-              <option value="open">Open Tendering</option>
-              <option value="restricted">Restricted</option>
-              <option value="direct">Direct</option>
-              <option value="two-stage">Two-Stage</option>
-            </select>
-            {(searchQuery || categoryFilter !== "all" || procurementFilter !== "all") && (
-              <button
-                type="button"
-                className="btn-reset-filters"
-                onClick={() => {
-                  setSearchQuery("");
-                  setCategoryFilter("all");
-                  setProcurementFilter("all");
-                }}
-              >
-                Reset Filters
-              </button>
-            )}
-          </div>
-        </div>
+          ) : (
+            <div className="tender-cards-list">
+              {sortedTenders.map((t) => {
+                const statusInfo = getTenderStatus(t, blockTimestamp);
+                const isSelected = activeTender && Number(activeTender.id) === Number(t.id);
+                const maxPriceFormatted = `${fmtAmount(t.ceilingPrice)} ${CURRENCY_SYMBOL}`;
+                const depositFormatted = `${fmtAmount(t.bidBond)} ${CURRENCY_SYMBOL}`;
 
-        {tenders.length === 0 ? (
-          <div className="empty-state-clean">
-            <p>
-              {dataLoadError
-                ? "Unable to load tenders due to connection error."
-                : isDataLoading
-                ? "Loading tenders from blockchain..."
-                : "No tenders yet"}
-            </p>
-          </div>
-        ) : sortedTenders.length === 0 ? (
-          <div className="empty-state-clean">
-            <p>No tenders match your filters</p>
-            <button
-              type="button"
-              className="btn-reset-filters"
-              onClick={() => {
-                setSearchQuery("");
-                setCategoryFilter("all");
-                setProcurementFilter("all");
-              }}
-            >
-              Reset Filters
-            </button>
-          </div>
-        ) : (
-          <div className="tender-cards-list">
-            {sortedTenders.map((t) => {
-              const statusInfo = getTenderStatus(t, blockTimestamp);
-              const isSelected = activeTender && Number(activeTender.id) === Number(t.id);
-              const maxPriceFormatted = `${ethers.formatEther(t.ceilingPrice)} ${CURRENCY_SYMBOL}`;
-              const depositFormatted = `${ethers.formatEther(t.bidBond)} ${CURRENCY_SYMBOL}`;
-
-              return (
-                <div
-                  key={t.id}
-                  className={`tender-summary-card ${isSelected ? "selected" : ""}`}
-                  onClick={() => handleSelectTender(t.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleSelectTender(t.id);
-                    }
-                  }}
-                  style={{ cursor: "pointer" }}
-                  aria-label={`Select Tender #${t.id}`}
-                >
-                  <div className="tender-card-header">
-                    <span className="tender-card-title">{getTenderHeading(t.id)}</span>
-                    <span className="tender-card-status">{statusInfo.label}</span>
-                  </div>
-
-                  {statusInfo.countdown && (
-                    <div className="tender-card-countdown">
-                      <span className="countdown-label">Time remaining:</span>{" "}
-                      <span className="countdown-val font-mono">{statusInfo.countdown}</span>
-                    </div>
-                  )}
-
-                  <div className="tender-card-financials">
-                    <div className="fin-item">
-                      <span className="fin-label">Max price:</span>
-                      <span className="fin-val font-mono">{maxPriceFormatted}</span>
-                    </div>
-                    <div className="fin-item">
-                      <span className="fin-label">Deposit:</span>
-                      <span className="fin-val font-mono">{depositFormatted}</span>
-                    </div>
-                  </div>
-
-                  <div className="tender-card-actions">
-                    <button
-                      type="button"
-                      className={`btn-view-tender ${isSelected ? "active" : ""}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectTender(t.id);
-                      }}
-                    >
-                      View
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* STEP 4: Detail view for the selected tender */}
-      {activeTender && (
-        <section className="tender-detail-view" aria-label="Selected Tender Details">
-          <div className="detail-view-header">
-            <div>
-              <h2 className="detail-view-title">{getTenderHeading(activeTender.id)}</h2>
-              <span className="detail-view-status">{getTenderStatus(activeTender, blockTimestamp).label}</span>
-            </div>
-            {/* STEP 5: "Try to cheat" Button */}
-            <button
-              type="button"
-              className="btn-try-cheat"
-              onClick={handleOpenCheatModal}
-              title="Run verification tests against on-chain contract invariants"
-            >
-              Try to cheat
-            </button>
-          </div>
-
-          {/* a) 4-step progress bar */}
-          <div className="progress-section">
-            <div className="progress-steps-bar" role="progressbar" aria-valuenow={progress.step} aria-valuemin={1} aria-valuemax={4}>
-              {[
-                { num: 1, title: "1 Bidding" },
-                { num: 2, title: "2 Opening" },
-                { num: 3, title: "3 Winner and funding" },
-                { num: 4, title: "4 Work and payment" },
-              ].map((s) => {
-                const isCurrent = s.num === progress.step;
-                const isPassed = s.num < progress.step;
                 return (
-                  <div key={s.num} className={`progress-step-item ${isCurrent ? "current" : isPassed ? "completed" : ""}`}>
-                    <div className="step-circle">{isPassed ? "✓" : s.num}</div>
-                    <span className="step-title">{s.title}</span>
+                  <div
+                    key={t.id}
+                    className={`tender-summary-card ${isSelected ? "selected" : ""}`}
+                    onClick={() => handleSelectTender(t.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleSelectTender(t.id);
+                      }
+                    }}
+                    style={{ cursor: "pointer" }}
+                    aria-label={`Select Tender #${t.id}`}
+                  >
+                    <div className="tender-card-header">
+                      <span className="tender-card-title">{getTenderHeading(t.id)}</span>
+                      <span className="tender-card-status">{statusInfo.label}</span>
+                    </div>
+
+                    {statusInfo.countdown && (
+                      <div className="tender-card-countdown">
+                        <span className="countdown-label">Time remaining:</span>{" "}
+                        <span className="countdown-val font-mono">{statusInfo.countdown}</span>
+                      </div>
+                    )}
+
+                    <div className="tender-card-financials">
+                      <div className="fin-item">
+                        <span className="fin-label">Max price:</span>
+                        <span className="fin-val font-mono">{maxPriceFormatted}</span>
+                      </div>
+                      <div className="fin-item">
+                        <span className="fin-label">Deposit:</span>
+                        <span className="fin-val font-mono">{depositFormatted}</span>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
-            <div className="what-happens-next-box">
-              <span className="what-next-label">What happens next:</span>{" "}
-              <span className="what-next-text">{progress.nextText}</span>
-            </div>
-          </div>
+          )}
+        </aside>
 
-          {/* b) "Bids" table */}
-          <div className="detail-section">
-            <h3 className="detail-section-title">Bids</h3>
-            {isDataLoading || (!isPropsForActive && isInternalLoading) ? (
-              <p className="clean-empty-msg">Loading bids...</p>
-            ) : isPreReveal ? (
-              effectiveCommittedBidders && effectiveCommittedBidders.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="clean-table">
-                    <thead>
-                      <tr>
-                        <th>Wallet</th>
-                        <th>Status</th>
-                        <th>Hash</th>
-                        <th>Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {effectiveCommittedBidders.map((b, i) => (
-                        <tr key={i}>
-                          <td className="font-mono">{b.bidder ? `${b.bidder.slice(0, 6)}...${b.bidder.slice(-4)}` : "--"}</td>
-                          <td>
-                            <span className="status-sealed">🔒 Sealed</span>
-                          </td>
-                          <td className="font-mono">{b.commitHash ? `${b.commitHash.slice(0, 10)}...${b.commitHash.slice(-8)}` : "--"}</td>
-                          <td>{b.commitTime && Number(b.commitTime) > 0 ? new Date(Number(b.commitTime) * 1000).toLocaleString() : "--"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        {/* Right Column: Selected Tender Details */}
+        <section className="tenders-detail-col tender-detail-view" aria-label="Selected Tender Details">
+          {activeTender ? (
+            <>
+              <div className="detail-view-header">
+                <div>
+                  <h2 className="detail-view-title">{getTenderHeading(activeTender.id)}</h2>
+                  <span className="detail-view-status">{getTenderStatus(activeTender, blockTimestamp).label}</span>
                 </div>
-              ) : (
-                <p className="clean-empty-msg">No bids submitted yet.</p>
-              )
-            ) : (
-              effectiveRevealedBids && effectiveRevealedBids.length > 0 ? (
-                <div className="table-responsive">
-                  <table className="clean-table">
-                    <thead>
-                      <tr>
-                        <th>Wallet</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {effectiveRevealedBids.map((b, i) => {
-                        const winningBidder = effectiveTenderDetails?.winningBidder || activeTender?.winningBidder;
-                        const isWinner =
-                          winningBidder &&
-                          winningBidder !== ethers.ZeroAddress &&
-                          b.bidder &&
-                          winningBidder.toLowerCase() === b.bidder.toLowerCase();
-                        return (
-                          <tr key={`rev-${i}`}>
+                {/* STEP 5: "Try to cheat" Button */}
+                <button
+                  type="button"
+                  className="btn-try-cheat"
+                  onClick={handleOpenCheatModal}
+                  title="Run verification tests against on-chain contract invariants"
+                >
+                  Try to cheat
+                </button>
+              </div>
+
+              {/* Deadlines metadata block */}
+              <div className="tender-deadlines-bar">
+                <div className="deadline-item">
+                  <span className="deadline-label">Commit Deadline:</span>{" "}
+                  <span className="deadline-val font-mono">{fmtDateTime(activeTender.commitDeadline)}</span>
+                </div>
+                <div className="deadline-item">
+                  <span className="deadline-label">Reveal Deadline:</span>{" "}
+                  <span className="deadline-val font-mono">{fmtDateTime(activeTender.revealDeadline)}</span>
+                </div>
+                {activeTender.escrowDeadline && Number(activeTender.escrowDeadline) > 0 && (
+                  <div className="deadline-item">
+                    <span className="deadline-label">Escrow Deadline:</span>{" "}
+                    <span className="deadline-val font-mono">{fmtDateTime(activeTender.escrowDeadline)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* a) 4-step progress bar */}
+              <div className="progress-section">
+                <div className="progress-steps-bar" role="progressbar" aria-valuenow={progress.step} aria-valuemin={1} aria-valuemax={4}>
+                  {[
+                    { num: 1, title: "1 Bidding" },
+                    { num: 2, title: "2 Opening" },
+                    { num: 3, title: "3 Winner and funding" },
+                    { num: 4, title: "4 Work and payment" },
+                  ].map((s) => {
+                    const isCurrent = s.num === progress.step;
+                    const isPassed = s.num < progress.step;
+                    return (
+                      <div key={s.num} className={`progress-step-item ${isCurrent ? "current" : isPassed ? "completed" : ""}`}>
+                        <div className="step-circle">{isPassed ? "✓" : s.num}</div>
+                        <span className="step-title">{s.title}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="what-happens-next-box">
+                  <span className="what-next-label">What happens next:</span>{" "}
+                  <span className="what-next-text">{progress.nextText}</span>
+                </div>
+              </div>
+
+              {/* b) "Bids" table */}
+              <div className="detail-section">
+                <h3 className="detail-section-title">Bids</h3>
+                {isDataLoading || (!isPropsForActive && isInternalLoading) ? (
+                  <p className="clean-empty-msg">Loading bids...</p>
+                ) : (effectiveCommittedBidders?.length ?? 0) === 0 ? (
+                  <p className="clean-empty-msg">No bids yet</p>
+                ) : isPreReveal ? (
+                  <div className="table-responsive">
+                    <table className="clean-table">
+                      <thead>
+                        <tr>
+                          <th>Wallet</th>
+                          <th>Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {effectiveCommittedBidders.map((b, i) => (
+                          <tr key={i}>
                             <td className="font-mono">{b.bidder ? `${b.bidder.slice(0, 6)}...${b.bidder.slice(-4)}` : "--"}</td>
-                            <td className="font-mono">{ethers.formatEther(b.amount ?? 0n)} {CURRENCY_SYMBOL}</td>
                             <td>
-                              {isWinner ? (
-                                <span className="label-winner">Lowest valid bid: automatic winner</span>
-                              ) : (
-                                <span className="label-revealed">Revealed</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {/* Committed bidders that did not reveal */}
-                      {effectiveCommittedBidders
-                        .filter((cb) => cb.bidder && !effectiveRevealedBids.some((rb) => rb.bidder && rb.bidder.toLowerCase() === cb.bidder.toLowerCase()))
-                        .map((cb, i) => (
-                          <tr key={`unrev-${i}`}>
-                            <td className="font-mono">{cb.bidder ? `${cb.bidder.slice(0, 6)}...${cb.bidder.slice(-4)}` : "--"}</td>
-                            <td className="font-mono">-</td>
-                            <td>
-                              <span className="label-forfeited">Did not open: deposit forfeited</span>
+                              <span className="status-sealed">🔒 Sealed</span>
                             </td>
                           </tr>
                         ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="clean-empty-msg">No bids to display.</p>
-              )
-            )}
-          </div>
-
-          {/* c) "Payment stages" table from getMilestones */}
-          <div className="detail-section">
-            <h3 className="detail-section-title">Payment stages</h3>
-            {isDataLoading || (!isPropsForActive && isInternalLoading) ? (
-              <p className="clean-empty-msg">Loading payment stages...</p>
-            ) : effectiveMilestones && effectiveMilestones.length > 0 ? (
-              <div className="table-responsive">
-                <table className="clean-table">
-                  <thead>
-                    <tr>
-                      <th>Stage</th>
-                      <th>Share %</th>
-                      <th>Due date</th>
-                      <th>Status</th>
-                      <th>Approvals</th>
-                      <th>Amount paid</th>
-                      <th>Penalty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {effectiveMilestones.map((m, idx) => {
-                      const statusNum = Number(m.status);
-                      const statusText =
-                        statusNum === 2 ? "Approved and paid" : statusNum === 1 ? "Work submitted" : "Waiting";
-                      const requiredApprovals = Number(
-                        effectiveTenderDetails?.approvalThreshold ||
-                        activeTender?.approvalThreshold ||
-                        2
-                      );
-                      const currentApprovals = Number(m.approvalCount || 0);
-                      const amountPaidText =
-                        statusNum === 2 ? `${ethers.formatEther(m.payoutAmount ?? 0n)} ${CURRENCY_SYMBOL}` : "-";
-                      let hasPenalty = false;
-                      try {
-                        hasPenalty = m.penaltyDeducted && BigInt(m.penaltyDeducted) > 0n;
-                      } catch {
-                        hasPenalty = false;
-                      }
-                      const penaltyText = hasPenalty
-                        ? `${ethers.formatEther(m.penaltyDeducted)} ${CURRENCY_SYMBOL}`
-                        : "-";
-
-                      return (
-                        <tr key={idx}>
-                          <td>Stage #{idx + 1}</td>
-                          <td>{(Number(m.percentageBps) / 100).toFixed(1)}%</td>
-                          <td>{m.dueDate && Number(m.dueDate) > 0 ? new Date(Number(m.dueDate) * 1000).toLocaleDateString() : "--"}</td>
-                          <td>
-                            <span
-                              className={
-                                statusNum === 2
-                                  ? "stage-approved"
-                                  : statusNum === 1
-                                  ? "stage-submitted"
-                                  : "stage-waiting"
-                              }
-                            >
-                              {statusText}
-                            </span>
-                          </td>
-                          <td>{currentApprovals} of {requiredApprovals}</td>
-                          <td className="font-mono">{amountPaidText}</td>
-                          <td className="font-mono">{penaltyText}</td>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="clean-table">
+                      <thead>
+                        <tr>
+                          <th>Wallet</th>
+                          <th>Amount</th>
+                          <th>Status</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {effectiveRevealedBids.map((b, i) => {
+                          const winningBidder = effectiveTenderDetails?.winningBidder || activeTender?.winningBidder;
+                          const isWinner =
+                            winningBidder &&
+                            winningBidder !== ethers.ZeroAddress &&
+                            b.bidder &&
+                            winningBidder.toLowerCase() === b.bidder.toLowerCase();
+                          return (
+                            <tr key={`rev-${i}`}>
+                              <td className="font-mono">{b.bidder ? `${b.bidder.slice(0, 6)}...${b.bidder.slice(-4)}` : "--"}</td>
+                              <td className="font-mono">{fmtAmount(b.amount ?? 0n)} {CURRENCY_SYMBOL}</td>
+                              <td>
+                                {isWinner ? (
+                                  <span className="label-winner">Lowest valid bid: automatic winner</span>
+                                ) : (
+                                  <span className="label-revealed">Revealed</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {/* Committed bidders that did not reveal */}
+                        {effectiveCommittedBidders
+                          .filter((cb) => cb.bidder && !effectiveRevealedBids.some((rb) => rb.bidder && rb.bidder.toLowerCase() === cb.bidder.toLowerCase()))
+                          .map((cb, i) => (
+                            <tr key={`unrev-${i}`}>
+                              <td className="font-mono">{cb.bidder ? `${cb.bidder.slice(0, 6)}...${cb.bidder.slice(-4)}` : "--"}</td>
+                              <td className="font-mono">-</td>
+                              <td>
+                                <span className="label-forfeited">Did not open: deposit forfeited</span>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            ) : (
-              <p className="clean-empty-msg">No payment stages defined.</p>
-            )}
-          </div>
 
-          {/* d) "Activity" list built from contract events */}
-          <div className="detail-section">
-            <h3 className="detail-section-title">Activity</h3>
-            {activityList.length > 0 ? (
-              <ul className="activity-clean-list">
-                {activityList.map((act, i) => (
-                  <li key={i} className="activity-clean-item">
-                    <span className="activity-sentence">{act.sentence}</span>
-                    <span className="activity-time">{act.time}</span>
-                    {act.txHash && cleanExplorerUrl && (
-                      <a
-                        href={`${cleanExplorerUrl}/tx/${act.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="activity-link"
-                      >
-                        Tx ↗
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="clean-empty-msg">No activity recorded for this tender yet.</p>
-            )}
-          </div>
+              {/* c) "Payment stages" table from getMilestones */}
+              <div className="detail-section">
+                <h3 className="detail-section-title">Payment stages</h3>
+                {isDataLoading || (!isPropsForActive && isInternalLoading) ? (
+                  <p className="clean-empty-msg">Loading payment stages...</p>
+                ) : effectiveMilestones && effectiveMilestones.length > 0 ? (
+                  <div className="table-responsive">
+                    <table className="clean-table">
+                      <thead>
+                        <tr>
+                          <th>Stage</th>
+                          <th>Share %</th>
+                          <th>Due date</th>
+                          <th>Status</th>
+                          <th>Approvals</th>
+                          <th>Amount paid</th>
+                          <th>Penalty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {effectiveMilestones.map((m, idx) => {
+                          const statusNum = Number(m.status);
+                          const statusText =
+                            statusNum === 2 ? "Approved and paid" : statusNum === 1 ? "Work submitted" : "Waiting";
+                          const requiredApprovals = Number(
+                            effectiveTenderDetails?.approvalThreshold ||
+                            activeTender?.approvalThreshold ||
+                            2
+                          );
+                          const currentApprovals = Number(m.approvalCount || 0);
+                          const amountPaidText =
+                            statusNum === 2 ? `${fmtAmount(m.payoutAmount ?? 0n)} ${CURRENCY_SYMBOL}` : "-";
+                          let hasPenalty = false;
+                          try {
+                            hasPenalty = m.penaltyDeducted && BigInt(m.penaltyDeducted) > 0n;
+                          } catch {
+                            hasPenalty = false;
+                          }
+                          const penaltyText = hasPenalty
+                            ? `${fmtAmount(m.penaltyDeducted)} ${CURRENCY_SYMBOL}`
+                            : "-";
+
+                          return (
+                            <tr key={idx}>
+                              <td>Stage #{idx + 1}</td>
+                              <td>{(Number(m.percentageBps) / 100).toFixed(1)}%</td>
+                              <td>{fmtDateTime(m.dueDate)}</td>
+                              <td>
+                                <span
+                                  className={
+                                    statusNum === 2
+                                      ? "stage-approved"
+                                      : statusNum === 1
+                                      ? "stage-submitted"
+                                      : "stage-waiting"
+                                  }
+                                >
+                                  {statusText}
+                                </span>
+                              </td>
+                              <td>{currentApprovals} of {requiredApprovals}</td>
+                              <td className="font-mono">{amountPaidText}</td>
+                              <td className="font-mono">{penaltyText}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="clean-empty-msg">No payment stages defined.</p>
+                )}
+              </div>
+
+              {/* d) "Activity" list built from contract events */}
+              <div className="detail-section">
+                <h3 className="detail-section-title">Activity</h3>
+                {activityList.length > 0 ? (
+                  <ul className="activity-clean-list">
+                    {activityList.map((act, i) => (
+                      <li key={i} className="activity-clean-item">
+                        <span className="activity-sentence">{act.sentence}</span>
+                        <span className="activity-time">{act.time}</span>
+                        {act.txHash && cleanExplorerUrl && (
+                          <a
+                            href={`${cleanExplorerUrl}/tx/${act.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="activity-link"
+                          >
+                            Tx ↗
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="clean-empty-msg">No activity recorded for this tender yet.</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="empty-state-clean">
+              <p>Select a tender to view details</p>
+            </div>
+          )}
         </section>
-      )}
+      </div>
 
       {/* STEP 5: "Try to cheat" Popup Modal */}
       {showCheatModal && (
