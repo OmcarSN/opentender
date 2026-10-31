@@ -19,6 +19,30 @@ import OfficerTab from "./components/OfficerTab";
 import TxNotification from "./components/TxNotification";
 import { parseContractError } from "./utils/errors";
 
+// Helper to resolve the correct wallet provider (handling multi-wallet collision)
+function getWalletProviderByName(name) {
+  if (typeof window === "undefined") return null;
+  const n = (name || "").toLowerCase();
+  if (n === "bridgekey" && (window.bridgekey || window.bridgeKey)) {
+    return window.bridgekey?.ethereum || window.bridgekey || window.bridgeKey;
+  }
+  if (window.ethereum && Array.isArray(window.ethereum.providers)) {
+    if (n === "bridgekey") {
+      const p = window.ethereum.providers.find((x) => x.isBridgeKey);
+      if (p) return p;
+    }
+    if (n === "metamask") {
+      const p = window.ethereum.providers.find((x) => x.isMetaMask && !x.isBridgeKey);
+      if (p) return p;
+    }
+    if (n === "coinbase" || n.includes("coinbase")) {
+      const p = window.ethereum.providers.find((x) => x.isCoinbaseWallet);
+      if (p) return p;
+    }
+  }
+  return window.ethereum || null;
+}
+
 export default function App() {
   const [account, setAccount] = useState(null);
   const [signer, setSigner] = useState(null);
@@ -40,7 +64,17 @@ export default function App() {
       return false;
     }
   });
-  const [activeWalletProvider, setActiveWalletProvider] = useState(() => (typeof window !== "undefined" ? window.ethereum || null : null));
+  const [activeWalletProvider, setActiveWalletProvider] = useState(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const savedName = localStorage.getItem("opentender_wallet_name");
+      if (savedName) {
+        const resolved = getWalletProviderByName(savedName);
+        if (resolved) return resolved;
+      }
+    } catch {}
+    return window.ethereum || null;
+  });
   const [activeWalletName, setActiveWalletName] = useState(() => {
     try {
       return localStorage.getItem("opentender_wallet_name") || "";
@@ -392,6 +426,7 @@ export default function App() {
         setActiveWalletName(walletName);
         try { localStorage.setItem("opentender_wallet_name", walletName); } catch {}
       }
+      try { localStorage.removeItem("opentender_disconnected"); } catch {}
       setAccount(addr);
       setSigner(s);
       setChainId(Number(network.chainId));
@@ -416,11 +451,22 @@ export default function App() {
   }
 
   function disconnectWallet() {
+    // Attempt wallet permission revocation if supported by the provider
+    if (activeWalletProvider && activeWalletProvider.request) {
+      activeWalletProvider.request({
+        method: "wallet_revokePermissions",
+        params: [{ eth_accounts: {} }]
+      }).catch(() => {
+        // Not all wallets support wallet_revokePermissions, safely ignore
+      });
+    }
+
     setAccount(null);
     setSigner(null);
     setActiveWalletProvider(null);
     setActiveWalletName("");
     setBalance("0");
+    setClaimableBalance(0n);
     setRoles({
       isRegistrar: false,
       isDepartment: false,
@@ -430,6 +476,7 @@ export default function App() {
     });
     try {
       localStorage.removeItem("opentender_wallet_name");
+      localStorage.setItem("opentender_disconnected", "true");
     } catch {}
   }
 
@@ -465,31 +512,55 @@ export default function App() {
     }
   }
 
-  // Handle account and network changes in active wallet
+  // Handle account and network changes in active wallet & silent auto-reconnect if already authorized
   useEffect(() => {
-    const p = activeWalletProvider || (typeof window !== "undefined" ? window.ethereum : null);
-    if (p && p.on) {
+    const p = activeWalletProvider || (typeof window !== "undefined" ? getWalletProviderByName(activeWalletName) : null);
+    if (!p) return;
+
+    // Silent auto-reconnect if the user did NOT explicitly click disconnect
+    let isExplicitlyDisconnected = false;
+    try {
+      isExplicitlyDisconnected = localStorage.getItem("opentender_disconnected") === "true";
+    } catch {}
+
+    if (!account && !isExplicitlyDisconnected && p.request) {
+      p.request({ method: "eth_accounts" })
+        .then((accounts) => {
+          if (accounts && accounts.length > 0) {
+            connectWalletWithProvider(p, activeWalletName);
+          }
+        })
+        .catch(() => {});
+    }
+
+    if (p.on) {
       const handleAccounts = (accounts) => {
         if (accounts && accounts.length > 0) {
-          connectWalletWithProvider(p);
+          connectWalletWithProvider(p, activeWalletName);
         } else {
-          setAccount(null);
-          setSigner(null);
+          disconnectWallet();
         }
       };
       const handleChain = () => {
         window.location.reload();
       };
+      const handleDisconnect = () => {
+        disconnectWallet();
+      };
+
       p.on("accountsChanged", handleAccounts);
       p.on("chainChanged", handleChain);
+      if (p.on) p.on("disconnect", handleDisconnect);
+
       return () => {
         if (p.removeListener) {
           p.removeListener("accountsChanged", handleAccounts);
           p.removeListener("chainChanged", handleChain);
+          p.removeListener("disconnect", handleDisconnect);
         }
       };
     }
-  }, [activeWalletProvider]);
+  }, [activeWalletProvider, activeWalletName]);
 
   useEffect(() => {
     loadContractData();
