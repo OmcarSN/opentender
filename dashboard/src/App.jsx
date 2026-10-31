@@ -54,24 +54,54 @@ export default function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam === "home" || tabParam === "bidder" || tabParam === "officer" || tabParam === "audit") {
+      // Explicit deep links to specific role portals
+      if (tabParam === "bidder" || tabParam === "officer") {
         return tabParam;
       }
+      // Explicit deep link to specific tender or cheat test
+      if (tabParam === "audit" && (params.get("cheat") === "true" || params.get("tender"))) {
+        return "audit";
+      }
+      if (tabParam === "home") {
+        return "home";
+      }
       const hash = window.location.hash.replace("#", "");
-      if (hash === "home" || hash === "bidder" || hash === "officer" || hash === "audit") {
+      if (hash === "bidder" || hash === "officer") {
         return hash;
       }
     } catch {
       // Fallback
     }
+    // Website always opens on "How it works" (home) page first
     return "home";
   });
+
+  // Clean root URL when opening website on home
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "audit" || tabParam === "home") {
+        if (!params.get("tender") && params.get("cheat") !== "true") {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("tab");
+          window.history.replaceState({}, "", url);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }, []);
 
   function handleTabChange(tab, openCheat = false) {
     setActiveTab(tab);
     try {
       const url = new URL(window.location.href);
-      url.searchParams.set("tab", tab);
+      if (tab === "home") {
+        url.searchParams.delete("tab");
+      } else {
+        url.searchParams.set("tab", tab);
+      }
       if (openCheat && tab === "audit") {
         url.searchParams.set("cheat", "true");
       } else {
