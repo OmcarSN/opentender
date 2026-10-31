@@ -173,6 +173,7 @@ export default function App() {
             winningAmount: t.winningAmount,
             approvalThreshold: Number(t.approvalThreshold),
             totalCommits: Number(t.totalCommits),
+            documentHash: t.documentHash,
           });
         } catch (e) {
           console.warn(`Error loading tender #${i}:`, e);
@@ -229,7 +230,7 @@ export default function App() {
       // Load recent past events
       try {
         const latestBlock = await readContract.runner.provider.getBlockNumber();
-        const fromBlock = Math.max(0, latestBlock - 500);
+        const fromBlock = Math.max(0, latestBlock - 5000);
         const filter = {
           address: CONTRACT_ADDRESS,
           fromBlock,
@@ -239,15 +240,43 @@ export default function App() {
         const iface = readContract.interface;
         const parsedLogs = [];
 
-        for (let i = rawLogs.length - 1; i >= 0 && parsedLogs.length < 15; i--) {
+        for (let i = rawLogs.length - 1; i >= 0 && parsedLogs.length < 30; i--) {
           try {
             const parsed = iface.parseLog(rawLogs[i]);
             if (parsed) {
+              // Extract tenderId if defined on event arguments
+              let tenderId = null;
+              if (parsed.args) {
+                if (parsed.args.tenderId !== undefined) {
+                  tenderId = Number(parsed.args.tenderId);
+                } else if (
+                  (parsed.name.startsWith("Tender") ||
+                    parsed.name.startsWith("Bid") ||
+                    parsed.name.startsWith("Milestone") ||
+                    parsed.name === "EscrowFunded" ||
+                    parsed.name === "BondRefundClaimed") &&
+                  parsed.args[0] !== undefined
+                ) {
+                  try {
+                    tenderId = Number(parsed.args[0]);
+                  } catch {
+                    tenderId = null;
+                  }
+                }
+              }
+
+              const description =
+                tenderId !== null
+                  ? `${parsed.name} on tender #${tenderId}`
+                  : `${parsed.name} event`;
+
               parsedLogs.push({
                 name: parsed.name,
-                description: `${parsed.name} on tender #${parsed.args?.tenderId?.toString() || ""}`,
+                tenderId: tenderId, // Normalized number or null for platform-wide events
+                description: description,
                 txHash: rawLogs[i].transactionHash,
                 time: "Confirmed",
+                args: parsed.args,
               });
             }
           } catch {

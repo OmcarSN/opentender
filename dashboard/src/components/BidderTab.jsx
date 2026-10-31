@@ -139,7 +139,25 @@ export default function BidderTab({
             }
           })
         );
-        if (isMounted) setUserCommitments(records);
+        if (isMounted) {
+          setUserCommitments((prev) => {
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(records);
+            if (prevKeys.length !== nextKeys.length) return records;
+            const changed = nextKeys.some((k) => {
+              const p = prev[k];
+              const n = records[k];
+              return (
+                !p ||
+                p.committed !== n.committed ||
+                p.revealed !== n.revealed ||
+                p.bondClaimed !== n.bondClaimed ||
+                p.commitTime !== n.commitTime
+              );
+            });
+            return changed ? records : prev;
+          });
+        }
       } catch {
         // Ignore read errors
       }
@@ -539,10 +557,56 @@ export default function BidderTab({
     return tenders.find((t) => String(t.id) === String(fundedTenderId)) || null;
   }, [tenders, fundedTenderId]);
 
-  // Milestone index chosen automatically
+  // Query milestone details for the selected funded tender
+  const [fundedMilestones, setFundedMilestones] = useState([]);
+  const [isLoadingMilestones, setIsLoadingMilestones] = useState(false);
+
+  const fetchFundedMilestones = useCallback(async () => {
+    if (!fundedTenderId) {
+      setFundedMilestones([]);
+      return;
+    }
+    try {
+      setIsLoadingMilestones(true);
+      const contract = getReadOnlyContract();
+      const ms = await contract.getMilestones(fundedTenderId);
+      setFundedMilestones(
+        ms.map((m) => ({
+          percentageBps: Number(m.percentageBps),
+          dueDate: Number(m.dueDate),
+          submittedAt: Number(m.submittedAt),
+          evidenceHash: m.evidenceHash,
+          approvalCount: Number(m.approvalCount),
+          status: Number(m.status),
+          payoutAmount: m.payoutAmount,
+          penaltyDeducted: m.penaltyDeducted,
+        }))
+      );
+    } catch {
+      setFundedMilestones([]);
+    } finally {
+      setIsLoadingMilestones(false);
+    }
+  }, [fundedTenderId]);
+
+  useEffect(() => {
+    fetchFundedMilestones();
+  }, [fetchFundedMilestones, latestBlockTimestamp]);
+
+  // Milestone index chosen automatically from completed milestones counter
   const autoMilestoneIndex = selectedFundedTender
     ? Number(selectedFundedTender.completedMilestones || 0)
     : 0;
+
+  // OpenTender contract enum: MilestoneStatus { Pending = 0, Submitted = 1, Approved = 2 }
+  const currentMilestone =
+    fundedMilestones && fundedMilestones.length > autoMilestoneIndex
+      ? fundedMilestones[autoMilestoneIndex]
+      : null;
+  const isCurrentMilestoneSubmitted =
+    currentMilestone !== null && Number(currentMilestone.status) === 1; // MilestoneStatus.Submitted
+  const areAllMilestonesDone =
+    fundedMilestones.length > 0 && autoMilestoneIndex >= fundedMilestones.length;
 
   let proofDisabledReason = null;
   if (!account) {
@@ -551,6 +615,13 @@ export default function BidderTab({
     proofDisabledReason = `Wrong Network — Switch to ${CHAIN_NAME}`;
   } else if (!selectedFundedTender) {
     proofDisabledReason = "You have no active awarded contracts in progress.";
+  } else if (isLoadingMilestones) {
+    proofDisabledReason = "Loading milestone data...";
+  } else if (areAllMilestonesDone) {
+    proofDisabledReason = "All milestones for this contract have been completed.";
+  } else if (isCurrentMilestoneSubmitted) {
+    proofDisabledReason =
+      "Milestone proof is already submitted and awaiting verifier approval.";
   } else if (!proofText.trim()) {
     proofDisabledReason = "Describe or paste a link to your proof";
   } else if (isSubmittingProof) {
@@ -561,7 +632,7 @@ export default function BidderTab({
 
   async function handleSubmitProof(e) {
     e.preventDefault();
-    if (!canSubmitProof || !selectedFundedTender || !signerContract) return;
+    if (!canSubmitProof || !selectedFundedTender || !signerContract || isCurrentMilestoneSubmitted) return;
 
     try {
       setIsSubmittingProof(true);
@@ -593,6 +664,7 @@ export default function BidderTab({
       });
 
       setProofText("");
+      await fetchFundedMilestones();
       if (onRefresh) onRefresh();
     } catch (err) {
       const msg = parseContractError(err);
@@ -608,30 +680,115 @@ export default function BidderTab({
   const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
   const [refundableTenders, setRefundableTenders] = useState([]);
   const [refundingTenderId, setRefundingTenderId] = useState(null);
+  const [refundCheckTrigger, setRefundCheckTrigger] = useState(0);
 
-  // Check refundable tenders by simulating claimBondRefund via staticCall
+  // Check refundable tenders via staticCall with smart pre-filtering and deadline scheduling
   useEffect(() => {
     let isMounted = true;
+    let deadlineTimer = null;
+
     async function checkRefundableDeposits() {
       if (!signerContract || !account || isWrongNetwork || !tenders || tenders.length === 0) {
         if (isMounted) setRefundableTenders([]);
         return;
       }
-      const eligible = [];
-      for (const t of tenders) {
-        try {
-          await signerContract.claimBondRefund.staticCall(t.id);
-          eligible.push(t);
-        } catch {
-          // Not eligible to refund
+
+      // Pre-filter tenders based on contract invariants to eliminate doomed RPC calls:
+      // In OpenTender.sol, claimBondRefund only succeeds for status Cancelled (6) or Awarded (2), Funded (3), Completed (4), Defaulted (7).
+      // Status None (0), Open (1), and Failed (5) always revert with BondNotRefundable.
+      const candidateTenders = tenders.filter((t) => {
+        const s = Number(t.status);
+        if (s !== 2 && s !== 3 && s !== 4 && s !== 6 && s !== 7) {
+          return false;
         }
+
+        const c = userCommitments[t.id];
+        if (c) {
+          // If we have commitment data for this tender:
+          // Must have committed and bond must not already be claimed
+          if (!c.committed || c.bondClaimed) return false;
+          // For non-cancelled tenders, losing bidder must have revealed and cannot be the winner
+          if (s !== 6) {
+            if (!c.revealed) return false;
+            if (t.winningBidder && t.winningBidder.toLowerCase() === account.toLowerCase()) {
+              return false;
+            }
+          }
+        }
+        return true;
+      });
+
+      if (candidateTenders.length === 0) {
+        if (isMounted) setRefundableTenders([]);
+        return;
       }
-      if (isMounted) {
-        setRefundableTenders(eligible);
+
+      // Run staticCall in parallel with safe individual error handling
+      try {
+        const results = await Promise.allSettled(
+          candidateTenders.map(async (t) => {
+            await signerContract.claimBondRefund.staticCall(t.id);
+            return t;
+          })
+        );
+
+        if (isMounted) {
+          const eligible = [];
+          results.forEach((res) => {
+            if (res.status === "fulfilled" && res.value) {
+              eligible.push(res.value);
+            }
+          });
+          setRefundableTenders(eligible);
+        }
+      } catch {
+        if (isMounted) setRefundableTenders([]);
       }
     }
+
+    // Schedule a timer around the next earliest deadline among active tenders rather than polling
+    const now = Math.floor(Date.now() / 1000);
+    let earliestDeadline = null;
+
+    for (const t of tenders) {
+      const c = userCommitments[t.id];
+      // Only schedule timers for tenders the user has committed to or that are active
+      if (!c || c.committed) {
+        const deadlines = [
+          Number(t.commitDeadline || 0),
+          Number(t.revealDeadline || 0),
+          Number(t.escrowFundingDeadline || 0),
+        ];
+        for (const dl of deadlines) {
+          if (dl > now) {
+            if (earliestDeadline === null || dl < earliestDeadline) {
+              earliestDeadline = dl;
+            }
+          }
+        }
+      }
+    }
+
+    if (earliestDeadline !== null) {
+      const delayMs = Math.max(1000, (earliestDeadline - now) * 1000 + 1000);
+      // Only schedule if within next 24 hours
+      if (delayMs <= 86400000) {
+        deadlineTimer = setTimeout(() => {
+          if (isMounted) {
+            setRefundCheckTrigger((n) => n + 1);
+            if (onRefresh) onRefresh();
+          }
+        }, delayMs);
+      }
+    }
+
     checkRefundableDeposits();
-  }, [signerContract, account, isWrongNetwork, tenders, latestBlockTimestamp]);
+
+    return () => {
+      isMounted = false;
+      if (deadlineTimer) clearTimeout(deadlineTimer);
+    };
+  }, [signerContract, account, isWrongNetwork, tenders, userCommitments, refundCheckTrigger, onRefresh]);
 
   async function handleWithdrawWaitingMoney() {
     if (!signerContract || !claimableBalance || claimableBalance === 0n || isSubmittingWithdraw) return;
@@ -677,6 +834,16 @@ export default function BidderTab({
         title: "Deposit Returned!",
         success: "Your deposit has been returned directly to your wallet.",
       });
+
+      // Instantly update local state so UI updates without waiting for re-fetch
+      setRefundableTenders((prev) => prev.filter((t) => Number(t.id) !== Number(tenderId)));
+      setUserCommitments((prev) => ({
+        ...prev,
+        [tenderId]: { ...(prev[tenderId] || {}), bondClaimed: true },
+      }));
+
+      // Trigger fresh eligibility check
+      setRefundCheckTrigger((n) => n + 1);
 
       if (onRefresh) onRefresh();
     } catch (err) {
@@ -1034,10 +1201,15 @@ export default function BidderTab({
       <div className="financials-split" style={{ marginTop: "1.75rem" }}>
         {/* Card 3: Submit proof of work */}
         <div className="milestone-submit-card">
-          <h4>3. If you win: submit proof of work</h4>
-          <p className="field-hint" style={{ marginBottom: "1rem" }}>
-            Submit verification documentation for your awarded milestones.
-          </p>
+          <div className="panel-header">
+            <div>
+              <h3>3. If you win: submit proof of work</h3>
+              <p className="panel-sub">
+                Submit verification documentation for your awarded milestones.
+              </p>
+            </div>
+            <span className="badge badge-shield">Contractor</span>
+          </div>
 
           <form onSubmit={handleSubmitProof} className="form-card">
             <div className="form-group">
@@ -1066,6 +1238,25 @@ export default function BidderTab({
                 <label>Target Milestone</label>
                 <div className="milestone-auto-tag">
                   Milestone #{autoMilestoneIndex + 1} (Milestone index: {autoMilestoneIndex})
+                  {currentMilestone && (
+                    <span style={{ marginLeft: "0.5rem" }}>
+                      — Status:{" "}
+                      {Number(currentMilestone.status) === 1
+                        ? "Work submitted (Awaiting verifier approval)"
+                        : Number(currentMilestone.status) === 2
+                        ? "Approved"
+                        : "Waiting for submission"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isCurrentMilestoneSubmitted && (
+              <div className="portal-alert alert-warning" style={{ margin: "0.5rem 0 1rem 0", padding: "0.6rem 0.85rem" }}>
+                <span className="portal-alert-icon">ℹ</span>
+                <div className="portal-alert-body">
+                  Milestone proof is already submitted and awaiting verifier approval.
                 </div>
               </div>
             )}
@@ -1076,7 +1267,7 @@ export default function BidderTab({
                 type="text"
                 placeholder="e.g. Completed foundations inspected. IPFS: Qm... or https://..."
                 value={proofText}
-                disabled={!account || !selectedFundedTender || isWrongNetwork}
+                disabled={!account || !selectedFundedTender || isWrongNetwork || isCurrentMilestoneSubmitted || areAllMilestonesDone}
                 onChange={(e) => setProofText(e.target.value)}
                 required
               />
@@ -1088,7 +1279,7 @@ export default function BidderTab({
             <div className="action-button-row">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-primary btn-block"
                 disabled={!canSubmitProof}
               >
                 {isSubmittingProof ? "Submitting proof..." : "Submit proof"}
@@ -1104,71 +1295,78 @@ export default function BidderTab({
 
         {/* STEP 6: Card "My money" */}
         <div className="pull-card">
-          <h4>My money</h4>
-          <p className="field-hint" style={{ marginBottom: "0.75rem" }}>
-            Withdraw accumulated milestone releases or claim refundable bid deposits.
-          </p>
-
-          {/* Section: Waiting for you */}
-          <div className="money-section-box">
-            <div className="money-subheading">Waiting for you</div>
-            <div className="pull-balance-display">
-              <span className="pull-val">
-                {claimableBalance
-                  ? parseFloat(ethers.formatEther(claimableBalance)).toFixed(4)
-                  : "0.0000"}{" "}
-                {CURRENCY_SYMBOL}
-              </span>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={
-                  !account ||
-                  !claimableBalance ||
-                  claimableBalance === 0n ||
-                  isWrongNetwork ||
-                  isSubmittingWithdraw
-                }
-                onClick={handleWithdrawWaitingMoney}
-              >
-                {isSubmittingWithdraw ? "Withdrawing..." : "Withdraw"}
-              </button>
+          <div className="panel-header">
+            <div>
+              <h3>My money</h3>
+              <p className="panel-sub">
+                Withdraw accumulated milestone releases or claim refundable bid deposits.
+              </p>
             </div>
-            {(!claimableBalance || claimableBalance === 0n) && (
-              <div className="btn-disabled-reason" style={{ marginTop: "0.35rem" }}>
-                <span className="reason-bullet">ℹ</span> No money waiting to withdraw
-              </div>
-            )}
+            <span className="badge badge-shield">Escrow</span>
           </div>
 
-          <div className="refund-divider" style={{ margin: "1.25rem 0" }} />
+          <div className="pull-card-body">
+            {/* Section: Waiting for you */}
+            <div className="money-section-box">
+              <div className="money-subheading">Waiting for you</div>
+              <div className="pull-balance-display">
+                <span className="pull-val">
+                  {claimableBalance
+                    ? parseFloat(ethers.formatEther(claimableBalance)).toFixed(4)
+                    : "0.0000"}{" "}
+                  {CURRENCY_SYMBOL}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={
+                    !account ||
+                    !claimableBalance ||
+                    claimableBalance === 0n ||
+                    isWrongNetwork ||
+                    isSubmittingWithdraw
+                  }
+                  onClick={handleWithdrawWaitingMoney}
+                >
+                  {isSubmittingWithdraw ? "Withdrawing..." : "Withdraw"}
+                </button>
+              </div>
+              {(!claimableBalance || claimableBalance === 0n) && (
+                <div className="btn-disabled-reason">
+                  <span className="reason-bullet">ℹ</span> No money waiting to withdraw
+                </div>
+              )}
+            </div>
 
-          {/* Section: Deposits you can get back */}
-          <div className="money-section-box">
-            <div className="money-subheading">Deposits you can get back</div>
-            {refundableTenders.length === 0 ? (
-              <div className="empty-tender-notice" style={{ marginTop: "0.5rem" }}>
-                No deposits available to get back right now.
-              </div>
-            ) : (
-              <div className="refundable-tenders-list" style={{ marginTop: "0.5rem" }}>
-                {refundableTenders.map((t) => (
-                  <div key={t.id} className="refundable-tender-item">
-                    <div className="refundable-info">
-                      <strong>Tender #{t.id}</strong> — Deposit: {ethers.formatEther(t.bidBond)} {CURRENCY_SYMBOL}
+            <div className="refund-divider" />
+
+            {/* Section: Deposits you can get back */}
+            <div className="money-section-box">
+              <div className="money-subheading">Deposits you can get back</div>
+              {refundableTenders.length === 0 ? (
+                <div className="empty-tender-notice">
+                  No deposits available to get back right now.
+                </div>
+              ) : (
+                <div className="refundable-tenders-list">
+                  {refundableTenders.map((t) => (
+                    <div key={t.id} className="refundable-tender-item">
+                      <div className="refundable-info">
+                        <strong>Tender #{t.id}</strong> — Deposit: {ethers.formatEther(t.bidBond)} {CURRENCY_SYMBOL}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-mini"
+                        disabled={isWrongNetwork || refundingTenderId === t.id}
+                        onClick={() => handleClaimDepositBack(t.id)}
+                      >
+                        {refundingTenderId === t.id ? "Claiming..." : "Get my deposit back"}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-mini"
-                      disabled={isWrongNetwork || refundingTenderId === t.id}
-                      onClick={() => handleClaimDepositBack(t.id)}
-                    >
-                      {refundingTenderId === t.id ? "Claiming..." : "Get my deposit back"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

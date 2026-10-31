@@ -1128,7 +1128,7 @@ export default function OfficerTab({
               </div>
             </details>
 
-            <div className="action-button-row" style={{ marginTop: "0.75rem" }}>
+            <div className="action-button-row">
               <button
                 type="submit"
                 className="btn btn-primary btn-block"
@@ -1158,15 +1158,85 @@ export default function OfficerTab({
           </div>
 
           {!account || !isDeptRole ? (
-            <div className="portal-alert alert-warning">
-              <span className="portal-alert-icon">⚠️</span>
-              <div className="portal-alert-body">
-                <strong>Department Access Required:</strong> Connect a department wallet to manage your tenders.
+            <div className="my-tenders-content-wrap">
+              <div className="portal-alert alert-warning">
+                <span className="portal-alert-icon">⚠️</span>
+                <div className="portal-alert-body">
+                  <strong>Department Access Required:</strong> Connect a department wallet to manage your tenders.
+                </div>
+              </div>
+              <div className="dept-workflow-card">
+                <div className="dept-workflow-title">Department Lifecycle Workflow</div>
+                <div className="dept-workflow-steps">
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">1</span>
+                    <div>
+                      <strong>Publish Tender Specifications</strong>
+                      <p>Define ceiling price, bid bond deposit, and multi-verifier quorum.</p>
+                    </div>
+                  </div>
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">2</span>
+                    <div>
+                      <strong>Collect Sealed Commitments</strong>
+                      <p>Registered bidders submit cryptographic commitments privately.</p>
+                    </div>
+                  </div>
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">3</span>
+                    <div>
+                      <strong>Open Bids &amp; Fund Escrow</strong>
+                      <p>Winning contractor is determined on-chain and contract escrow is locked.</p>
+                    </div>
+                  </div>
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">4</span>
+                    <div>
+                      <strong>Milestone Escrow Governance</strong>
+                      <p>Independent verifiers approve completed deliverables before payments unlock.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : myTenders.length === 0 ? (
-            <div className="empty-tender-notice">
-              No tenders published by your department wallet yet. Use the form on the left to publish your first tender.
+            <div className="my-tenders-content-wrap">
+              <div className="empty-tender-notice">
+                No tenders published by your department wallet yet. Use the form on the left to publish your first tender.
+              </div>
+              <div className="dept-workflow-card">
+                <div className="dept-workflow-title">Department Lifecycle Workflow</div>
+                <div className="dept-workflow-steps">
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">1</span>
+                    <div>
+                      <strong>Publish Tender Specifications</strong>
+                      <p>Define ceiling price, bid bond deposit, and multi-verifier quorum.</p>
+                    </div>
+                  </div>
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">2</span>
+                    <div>
+                      <strong>Collect Sealed Commitments</strong>
+                      <p>Registered bidders submit cryptographic commitments privately.</p>
+                    </div>
+                  </div>
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">3</span>
+                    <div>
+                      <strong>Open Bids &amp; Fund Escrow</strong>
+                      <p>Winning contractor is determined on-chain and contract escrow is locked.</p>
+                    </div>
+                  </div>
+                  <div className="dept-workflow-step">
+                    <span className="step-badge">4</span>
+                    <div>
+                      <strong>Milestone Escrow Governance</strong>
+                      <p>Independent verifiers approve completed deliverables before payments unlock.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="my-tenders-list">
@@ -1242,8 +1312,17 @@ export default function OfficerTab({
           </div>
 
           {!isVerifierRole ? (
-            <div className="single-grey-line">
-              Connect a verifier wallet to approve work
+            <div className="single-grey-line role-auth-box">
+              <div className="role-auth-icon-wrap verifier-auth-icon">
+                <span className="role-auth-glyph">🛡️</span>
+              </div>
+              <div className="role-auth-title">Verifier Role Required</div>
+              <div className="role-auth-text">
+                Connect a verifier wallet to approve work
+              </div>
+              <div className="role-auth-hint">
+                Only wallets designated in a tender's verifier quorum can inspect submitted proofs and authorize milestone releases.
+              </div>
             </div>
           ) : isCheckingVerifications ? (
             <div className="empty-tender-notice">Checking submitted work...</div>
@@ -1299,8 +1378,17 @@ export default function OfficerTab({
           </div>
 
           {!isRegistrarRole ? (
-            <div className="single-grey-line">
-              Connect an admin wallet to manage participants
+            <div className="single-grey-line role-auth-box">
+              <div className="role-auth-icon-wrap admin-auth-icon">
+                <span className="role-auth-glyph">⚙️</span>
+              </div>
+              <div className="role-auth-title">Admin Role Required</div>
+              <div className="role-auth-text">
+                Connect an admin wallet to manage participants
+              </div>
+              <div className="role-auth-hint">
+                Only the designated registrar address can add verified participants, register bidders, and enforce compliance debarment.
+              </div>
             </div>
           ) : (
             <div className="admin-forms-stack">
