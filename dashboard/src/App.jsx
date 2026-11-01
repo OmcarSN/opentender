@@ -634,6 +634,7 @@ export default function App() {
             chainId={chainId}
             roles={roles}
             latestBlockTimestamp={latestBlockTimestamp}
+            onConnectWallet={() => setShowWalletModal(true)}
           />
         )}
 

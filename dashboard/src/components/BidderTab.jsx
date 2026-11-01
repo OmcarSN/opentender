@@ -66,6 +66,7 @@ export default function BidderTab({
   chainId = null,
   roles = {},
   latestBlockTimestamp = 0,
+  onConnectWallet,
 }) {
   const isWrongNetwork = chainId !== null && Number(chainId) !== CHAIN_ID;
   const currentTime = latestBlockTimestamp || Math.floor(Date.now() / 1000);
@@ -235,6 +236,14 @@ export default function BidderTab({
     commitDisabledReason = `Wrong Network — Switch to ${CHAIN_NAME}`;
   } else if (!selectedCommitTender) {
     commitDisabledReason = "No tender is taking bids right now.";
+  } else if (Number(selectedCommitTender.status) !== 1) {
+    commitDisabledReason = "This tender is not open for bidding.";
+  } else if (selectedCommitTender.commitDeadline && currentTime > selectedCommitTender.commitDeadline) {
+    if (selectedCommitTender.revealDeadline && currentTime <= selectedCommitTender.revealDeadline) {
+      commitDisabledReason = "Bidding phase ended. This tender is currently in the Opening phase.";
+    } else {
+      commitDisabledReason = "Bidding has closed for this tender.";
+    }
   } else if (isBidderRegistered === false) {
     commitDisabledReason = "Your wallet is not registered as a bidder";
   } else if (alreadyCommitted) {
@@ -255,7 +264,22 @@ export default function BidderTab({
 
   async function handlePlaceSealedBid(e) {
     e.preventDefault();
-    if (!canSubmitCommit || !selectedCommitTender || !signerContract) return;
+    if (!account) {
+      if (onConnectWallet) onConnectWallet();
+      return;
+    }
+    if (!selectedCommitTender) return;
+
+    if (Number(selectedCommitTender.status) !== 1 || (selectedCommitTender.commitDeadline && currentTime > selectedCommitTender.commitDeadline)) {
+      setNotification({
+        active: false,
+        title: "Bidding Unavailable",
+        error: "Bidding has closed for this tender. Commitments are no longer accepted.",
+      });
+      return;
+    }
+
+    if (!canSubmitCommit || !signerContract) return;
 
     try {
       setIsSubmittingCommit(true);
@@ -974,7 +998,7 @@ export default function BidderTab({
                 min="0.0001"
                 placeholder={selectedCommitTender ? `e.g. ${(ceilingNum * 0.85).toFixed(4)}` : "Select tender first"}
                 value={bidAmount}
-                disabled={!account || !selectedCommitTender || isWrongNetwork || alreadyCommitted}
+                disabled={!account || !selectedCommitTender || isWrongNetwork || alreadyCommitted || (selectedCommitTender.commitDeadline && currentTime > selectedCommitTender.commitDeadline)}
                 onChange={(e) => setBidAmount(e.target.value)}
                 required
               />

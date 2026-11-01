@@ -36,6 +36,15 @@ export function parseContractError(error) {
   // 1. Try parsing custom error data with interface
   try {
     let data = error?.data || error?.info?.error?.data || error?.error?.data;
+    if (!data && typeof error?.message === "string") {
+      const match = error.message.match(/0x[0-9a-fA-F]{8,}/);
+      if (match) data = match[0];
+    }
+    if (!data && typeof error?.info?.error?.message === "string") {
+      const match = error.info.error.message.match(/0x[0-9a-fA-F]{8,}/);
+      if (match) data = match[0];
+    }
+
     if (typeof data === "string" && data.startsWith("0x")) {
       const parsed = iface.parseError(data);
       if (parsed && ERROR_TRANSLATIONS[parsed.name]) {
@@ -47,25 +56,39 @@ export function parseContractError(error) {
   }
 
   // 2. Substring matching for error names in string representation
-  const errString = (error.message || error.toString() || "").toLowerCase();
+  const rawMsg = [
+    error.message,
+    error.shortMessage,
+    error.reason,
+    error.info?.error?.message,
+    error.toString?.(),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
   for (const [key, msg] of Object.entries(ERROR_TRANSLATIONS)) {
-    if (errString.includes(key.toLowerCase())) {
+    if (rawMsg.includes(key.toLowerCase())) {
       return msg;
     }
   }
 
   if (
-    errString.includes("user rejected") ||
-    errString.includes("action_rejected") ||
-    errString.includes("user denied") ||
+    rawMsg.includes("user rejected") ||
+    rawMsg.includes("action_rejected") ||
+    rawMsg.includes("user denied") ||
     error?.code === 4001 ||
     error?.code === "ACTION_REJECTED"
   ) {
     return "Connection request was cancelled in your wallet.";
   }
 
-  if (errString.includes("insufficient funds")) {
-    return "Insufficient balance in wallet for gas and transaction value.";
+  if (rawMsg.includes("insufficient funds")) {
+    return "Insufficient balance in wallet to cover required deposit and gas fees.";
+  }
+
+  if (rawMsg.includes("missing revert data")) {
+    return "Transaction simulation failed. The bidding deadline may have passed or the contract conditions were not met.";
   }
 
   return error.reason || error.shortMessage || error.message || "Transaction reverted on-chain.";
