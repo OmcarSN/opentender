@@ -398,6 +398,12 @@ header, nav, nav a, button, .tab, .pill {
   letter-spacing: 0.02em;
 }
 
+.wallet-role-badge.badge-debarred {
+  background: rgba(239, 68, 68, 0.16);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
 .wallet-balance-amt {
   color: var(--emerald-light);
   font-weight: 600;

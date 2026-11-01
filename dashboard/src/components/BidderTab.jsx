@@ -76,6 +76,7 @@ export default function BidderTab({
   // ---------------------------------------------------------------------------
   const [walletBalance, setWalletBalance] = useState(null);
   const [isBidderRegistered, setIsBidderRegistered] = useState(null);
+  const [isBidderDebarred, setIsBidderDebarred] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -84,6 +85,7 @@ export default function BidderTab({
         if (isMounted) {
           setWalletBalance(null);
           setIsBidderRegistered(false);
+          setIsBidderDebarred(false);
         }
         return;
       }
@@ -96,14 +98,23 @@ export default function BidderTab({
       }
 
       if (roles && typeof roles.isBidder === "boolean") {
-        if (isMounted) setIsBidderRegistered(roles.isBidder);
+        if (isMounted) {
+          setIsBidderRegistered(roles.isBidder);
+          setIsBidderDebarred(Boolean(roles.isDebarred));
+        }
       } else {
         try {
           const contract = getReadOnlyContract();
           const status = await contract.getBidderStatus(account);
-          if (isMounted) setIsBidderRegistered(Boolean(status.registered));
+          if (isMounted) {
+            setIsBidderRegistered(Boolean(status.registered));
+            setIsBidderDebarred(Boolean(status.debarred));
+          }
         } catch {
-          if (isMounted) setIsBidderRegistered(false);
+          if (isMounted) {
+            setIsBidderRegistered(false);
+            setIsBidderDebarred(false);
+          }
         }
       }
     }
@@ -245,7 +256,9 @@ export default function BidderTab({
       commitDisabledReason = "Bidding has closed for this tender.";
     }
   } else if (isBidderRegistered === false) {
-    commitDisabledReason = "Your wallet is not registered as a bidder";
+    commitDisabledReason = "Your wallet is not registered as a bidder. Contact the tender administrator.";
+  } else if (isBidderDebarred) {
+    commitDisabledReason = "Your wallet has been debarred from bidding on tenders.";
   } else if (alreadyCommitted) {
     commitDisabledReason = "You already placed a bid on this tender";
   } else if (!hasEnoughDeposit) {
@@ -275,6 +288,24 @@ export default function BidderTab({
         active: false,
         title: "Bidding Unavailable",
         error: "Bidding has closed for this tender. Commitments are no longer accepted.",
+      });
+      return;
+    }
+
+    if (isBidderRegistered === false) {
+      setNotification({
+        active: false,
+        title: "Registration Required",
+        error: "Your wallet is not registered as a bidder. Contact the tender administrator.",
+      });
+      return;
+    }
+
+    if (isBidderDebarred) {
+      setNotification({
+        active: false,
+        title: "Wallet Debarred",
+        error: "This wallet is debarred from participating in tenders.",
       });
       return;
     }
@@ -895,6 +926,24 @@ export default function BidderTab({
             <span className="portal-alert-icon">⚠</span>
             <div className="portal-alert-body">
               <strong>Wallet Disconnected:</strong> Connect your wallet to bid.
+            </div>
+          </div>
+        )}
+
+        {account && isBidderRegistered === false && (
+          <div className="portal-alert alert-warning" style={{ marginTop: "1rem" }}>
+            <span className="portal-alert-icon">⚠</span>
+            <div className="portal-alert-body">
+              <strong>Registration Required:</strong> Only approved vendors can participate in bidding. Contact the tender administrator to register your wallet.
+            </div>
+          </div>
+        )}
+
+        {account && isBidderDebarred && (
+          <div className="portal-alert alert-error" style={{ marginTop: "1rem" }}>
+            <span className="portal-alert-icon">✖</span>
+            <div className="portal-alert-body">
+              <strong>Wallet Debarred:</strong> Your wallet has been debarred from tender bidding by the registrar.
             </div>
           </div>
         )}

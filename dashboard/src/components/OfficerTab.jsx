@@ -806,6 +806,9 @@ export default function OfficerTab({
   const [blockBidderAddress, setBlockBidderAddress] = useState("");
   const [blockBidderReason, setBlockBidderReason] = useState("");
 
+  // Form 3: Reinstate a bidder
+  const [reinstateBidderAddress, setReinstateBidderAddress] = useState("");
+
   const isParticipantAddressValid =
     participantAddress.trim().length > 0 && ethers.isAddress(participantAddress.trim());
 
@@ -819,6 +822,9 @@ export default function OfficerTab({
     blockBidderAddress.trim().length > 0 && ethers.isAddress(blockBidderAddress.trim());
   const isBlockBidderReasonValid = blockBidderReason.trim().length > 0;
   const isBlockBidderValid = isBlockBidderAddressValid && isBlockBidderReasonValid;
+
+  const isReinstateBidderAddressValid =
+    reinstateBidderAddress.trim().length > 0 && ethers.isAddress(reinstateBidderAddress.trim());
 
   async function handleAddParticipant(e) {
     e.preventDefault();
@@ -903,6 +909,37 @@ export default function OfficerTab({
       setNotification({
         active: false,
         title: "Failed to Block Bidder",
+        error: parseContractError(err),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleReinstateBidder(e) {
+    e.preventDefault();
+    if (!signerContract || !isReinstateBidderAddressValid || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      const targetAddress = reinstateBidderAddress.trim();
+
+      setNotification({ active: true, title: `Reinstating bidder ${targetAddress.slice(0, 6)}...` });
+      const tx = await signerContract.reinstateBidder(targetAddress);
+      await tx.wait();
+
+      setNotification({
+        active: false,
+        title: "Bidder Reinstated",
+        success: `Wallet ${targetAddress} has been reinstated and can participate in tenders again.`,
+      });
+
+      setReinstateBidderAddress("");
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      setNotification({
+        active: false,
+        title: "Failed to Reinstate Bidder",
         error: parseContractError(err),
       });
     } finally {
@@ -1619,6 +1656,36 @@ export default function OfficerTab({
                   disabled={isSubmitting || !isBlockBidderValid || isWrongNetwork}
                 >
                   {isSubmitting ? "Blocking bidder..." : "Block bidder"}
+                </button>
+              </form>
+
+              <div className="admin-divider" />
+
+              {/* Form 3: Reinstate a bidder */}
+              <form onSubmit={handleReinstateBidder} className="form-card admin-sub-card">
+                <h4 className="admin-subheading">Reinstate a debarred bidder</h4>
+
+                <div className="form-group">
+                  <label>Debarred Bidder Address</label>
+                  <input
+                    type="text"
+                    placeholder="Debarred Wallet (0x...)"
+                    value={reinstateBidderAddress}
+                    disabled={isSubmitting || isWrongNetwork}
+                    onChange={(e) => setReinstateBidderAddress(e.target.value)}
+                    required
+                  />
+                  {reinstateBidderAddress.length > 0 && !isReinstateBidderAddressValid && (
+                    <div className="field-validation-error">Must be a valid 42-character 0x address.</div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-secondary btn-block"
+                  disabled={isSubmitting || !isReinstateBidderAddressValid || isWrongNetwork}
+                >
+                  {isSubmitting ? "Reinstating bidder..." : "Reinstate bidder"}
                 </button>
               </form>
             </div>
