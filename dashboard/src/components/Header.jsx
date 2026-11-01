@@ -11,6 +11,7 @@ export default function Header({
   onConnect,
   onDisconnect,
   onSwitchNetwork,
+  onRetryRoleCheck,
   isRpcOnline = true,
 }) {
   const isWrongNetwork = Boolean(account && chainId && chainId !== CHAIN_ID);
@@ -33,6 +34,7 @@ export default function Header({
 
   // Plain words role label priority: Admin, Department, Verifier, Bidder, Blocked bidder, Visitor (no role)
   const getRoleLabel = () => {
+    if (roles?.isError) return "Could not check role. Retry";
     if (roles?.isLoading) return "Checking role...";
     if (!roles) return "Visitor (no role)";
     if (roles.isRegistrar) return "Admin";
@@ -44,6 +46,14 @@ export default function Header({
   };
 
   const roleLabel = getRoleLabel();
+
+  // Balance display helper: if read fails or pending, show "..." and not 0.0000
+  const renderBalance = () => {
+    if (balance === "..." || !balance || isNaN(parseFloat(balance))) {
+      return "...";
+    }
+    return `${parseFloat(balance).toFixed(4)} ${CURRENCY_SYMBOL}`;
+  };
 
   return (
     <>
@@ -116,11 +126,28 @@ export default function Header({
           {account ? (
             <div className="vita-wallet-wrapper" ref={menuRef}>
               <div className="vita-wallet-pill-group">
-                <span className={`wallet-role-badge ${roles?.isDebarred ? "badge-blocked" : roles?.isLoading ? "badge-loading" : ""}`}>
-                  {roleLabel}
-                </span>
+                {roles?.isError ? (
+                  <button
+                    type="button"
+                    className="wallet-role-badge badge-error"
+                    onClick={onRetryRoleCheck}
+                    title="Could not check role. Click to retry."
+                    style={{
+                      cursor: "pointer",
+                      background: "rgba(239, 68, 68, 0.15)",
+                      color: "#f87171",
+                      border: "1px solid rgba(239, 68, 68, 0.35)",
+                    }}
+                  >
+                    Could not check role. Retry
+                  </button>
+                ) : (
+                  <span className={`wallet-role-badge ${roles?.isDebarred ? "badge-blocked" : roles?.isLoading ? "badge-loading" : ""}`}>
+                    {roleLabel}
+                  </span>
+                )}
                 <span className="wallet-balance-amt font-mono">
-                  {parseFloat(balance || "0").toFixed(4)} {CURRENCY_SYMBOL}
+                  {renderBalance()}
                 </span>
                 <button
                   type="button"

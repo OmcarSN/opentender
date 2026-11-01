@@ -9,6 +9,7 @@ import {
   EXPLORER_URL,
   getReadOnlyContract,
   getSignerContract,
+  OpenTenderABI,
 } from "./config";
 import Header from "./components/Header";
 import WalletModal from "./components/WalletModal";
@@ -43,11 +44,56 @@ function getWalletProviderByName(name) {
   return window.ethereum || null;
 }
 
+// Helper for 6-second timeout on individual RPC calls
+function withTimeout(promise, ms = 6000, callName = "call") {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const err = new Error(`${callName} timed out after ${ms / 1000}s`);
+      reject(err);
+    }, ms);
+
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+// Concurrency pool runner: executes tasks with at most `limit` running concurrently (max 2)
+async function runWithConcurrency(tasks, limit = 2) {
+  const results = new Array(tasks.length);
+  let nextIdx = 0;
+
+  async function worker() {
+    while (nextIdx < tasks.length) {
+      const idx = nextIdx++;
+      try {
+        results[idx] = await tasks[idx]();
+      } catch (err) {
+        results[idx] = { __error: err };
+      }
+    }
+  }
+
+  const workerCount = Math.min(limit, tasks.length);
+  const workers = [];
+  for (let i = 0; i < workerCount; i++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+  return results;
+}
+
 export default function App() {
   const [account, setAccount] = useState(null);
   const [signer, setSigner] = useState(null);
   const [chainId, setChainId] = useState(null);
-  const [balance, setBalance] = useState("0");
+  const [balance, setBalance] = useState("...");
   const [roles, setRoles] = useState({
     isRegistrar: false,
     isDepartment: false,
@@ -55,6 +101,7 @@ export default function App() {
     isBidder: false,
     isDebarred: false,
     isLoading: false,
+    isError: false,
   });
 
   const [showWalletModal, setShowWalletModal] = useState(() => {
@@ -360,8 +407,10 @@ export default function App() {
     }
   }, [selectedTenderId]);
 
-  // Check roles and balances for connected account with retry, normalization, and stale result protection
+  // Check roles and balances for connected account with retry, normalization, concurrency limit (max 2), 6s timeout, BrowserProvider fallback, and 20s watchdog
   const roleRequestCounter = useRef(0);
+  const roleWatchdogTimer = useRef(null);
+
   const checkAccountRoles = useCallback(async (userAddress, userSigner) => {
     if (!userAddress) return;
 
@@ -373,59 +422,222 @@ export default function App() {
     }
 
     const currentRequestId = ++roleRequestCounter.current;
-    setRoles((prev) => ({ ...prev, isLoading: true }));
+    let isWatchdogAborted = false;
 
-    const contract = readContract;
-    const provider = contract.runner.provider;
+    // Reset error, show loading, and set balance to "..." while fetching
+    setRoles((prev) => ({ ...prev, isLoading: true, isError: false }));
+    setBalance((prev) => (prev && prev !== "0" && prev !== "0.0000" ? prev : "..."));
+
+    // Watchdog timer: never show "Checking role..." for more than 20 seconds
+    if (roleWatchdogTimer.current) {
+      clearTimeout(roleWatchdogTimer.current);
+    }
+    roleWatchdogTimer.current = setTimeout(() => {
+      if (roleRequestCounter.current === currentRequestId) {
+        console.warn("[OpenTender] Role check 20-second limit reached. Displaying retry.");
+        isWatchdogAborted = true;
+        setRoles((prev) => ({ ...prev, isLoading: false, isError: true }));
+        setBalance((prev) => (prev && prev !== "0" && prev !== "0.0000" ? prev : "..."));
+      }
+    }, 20000);
 
     const REGISTRAR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REGISTRAR_ROLE"));
     const DEPARTMENT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("DEPARTMENT_ROLE"));
     const VERIFIER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("VERIFIER_ROLE"));
     const DEFAULT_ADMIN = ethers.ZeroHash;
 
-    let lastError = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const [userBalance, isReg, isAdm, isDept, isVerif, bInfo, cBal] = await Promise.all([
-          provider.getBalance(normAddress),
-          contract.hasRole(REGISTRAR_ROLE, normAddress),
-          contract.hasRole(DEFAULT_ADMIN, normAddress),
-          contract.hasRole(DEPARTMENT_ROLE, normAddress),
-          contract.hasRole(VERIFIER_ROLE, normAddress),
-          contract.getBidderStatus(normAddress),
-          contract.claimableBalance(normAddress).catch(() => 0n),
-        ]);
+    // Helper to run batch of queries with 6s timeout per call and at most 2 requests concurrently
+    const executeQueryBatch = async (targetContract, targetProvider, providerName) => {
+      const taskList = [
+        // 0: balance
+        async () => {
+          try {
+            return await withTimeout(targetProvider.getBalance(normAddress), 6000, `${providerName} getBalance`);
+          } catch (err) {
+            console.error(`[OpenTender] ${providerName} getBalance failed:`, err?.message || err);
+            throw err;
+          }
+        },
+        // 1: registrar
+        async () => {
+          try {
+            return await withTimeout(targetContract.hasRole(REGISTRAR_ROLE, normAddress), 6000, `${providerName} hasRole(REGISTRAR)`);
+          } catch (err) {
+            console.error(`[OpenTender] ${providerName} hasRole(REGISTRAR) failed:`, err?.message || err);
+            throw err;
+          }
+        },
+        // 2: admin
+        async () => {
+          try {
+            return await withTimeout(targetContract.hasRole(DEFAULT_ADMIN, normAddress), 6000, `${providerName} hasRole(ADMIN)`);
+          } catch (err) {
+            console.error(`[OpenTender] ${providerName} hasRole(ADMIN) failed:`, err?.message || err);
+            throw err;
+          }
+        },
+        // 3: department
+        async () => {
+          try {
+            return await withTimeout(targetContract.hasRole(DEPARTMENT_ROLE, normAddress), 6000, `${providerName} hasRole(DEPARTMENT)`);
+          } catch (err) {
+            console.error(`[OpenTender] ${providerName} hasRole(DEPARTMENT) failed:`, err?.message || err);
+            throw err;
+          }
+        },
+        // 4: verifier
+        async () => {
+          try {
+            return await withTimeout(targetContract.hasRole(VERIFIER_ROLE, normAddress), 6000, `${providerName} hasRole(VERIFIER)`);
+          } catch (err) {
+            console.error(`[OpenTender] ${providerName} hasRole(VERIFIER) failed:`, err?.message || err);
+            throw err;
+          }
+        },
+        // 5: bidderStatus
+        async () => {
+          try {
+            return await withTimeout(targetContract.getBidderStatus(normAddress), 6000, `${providerName} getBidderStatus`);
+          } catch (err) {
+            console.error(`[OpenTender] ${providerName} getBidderStatus failed:`, err?.message || err);
+            throw err;
+          }
+        },
+        // 6: claimableBalance
+        async () => {
+          try {
+            return await withTimeout(targetContract.claimableBalance(normAddress), 6000, `${providerName} claimableBalance`);
+          } catch (err) {
+            console.error(`[OpenTender] ${providerName} claimableBalance failed:`, err?.message || err);
+            throw err;
+          }
+        },
+      ];
 
-        // Protect against stale results: if a newer request was dispatched, ignore this one
-        if (roleRequestCounter.current !== currentRequestId) {
+      return await runWithConcurrency(taskList, 2);
+    };
+
+    // Helper to get fallback provider from connected wallet's BrowserProvider
+    const getWalletFallback = () => {
+      try {
+        let p = null;
+        if (userSigner && userSigner.provider) {
+          p = userSigner.provider;
+        } else if (activeWalletProvider) {
+          p = new ethers.BrowserProvider(activeWalletProvider);
+        } else if (typeof window !== "undefined" && window.ethereum) {
+          p = new ethers.BrowserProvider(window.ethereum);
+        }
+        if (p) {
+          const c = new ethers.Contract(CONTRACT_ADDRESS, OpenTenderABI, p);
+          return { provider: p, contract: c };
+        }
+      } catch (e) {
+        console.error("[OpenTender] Failed to create wallet fallback provider:", e?.message || e);
+      }
+      return { provider: null, contract: null };
+    };
+
+    try {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        if (isWatchdogAborted || roleRequestCounter.current !== currentRequestId) {
           return;
         }
 
-        setBalance(ethers.formatEther(userBalance));
-        setRoles({
-          isRegistrar: Boolean(isReg || isAdm),
-          isDepartment: Boolean(isDept),
-          isVerifier: Boolean(isVerif),
-          isBidder: Boolean(bInfo.registered),
-          isDebarred: Boolean(bInfo.debarred),
-          isLoading: false,
-        });
-        setClaimableBalance(cBal);
-        return;
-      } catch (err) {
-        lastError = err;
+        // 1. Try read-only provider first
+        let results = await executeQueryBatch(readContract, readContract.runner.provider, "ReadOnly");
+
+        if (isWatchdogAborted || roleRequestCounter.current !== currentRequestId) {
+          return;
+        }
+
+        // Check if any role call failed
+        const [balRes, regRes, admRes, deptRes, verifRes, bidderRes, claimRes] = results;
+        const roleFailed = regRes?.__error || admRes?.__error || deptRes?.__error || verifRes?.__error || bidderRes?.__error;
+
+        // 2. If read-only provider failed on roles, retry through wallet's BrowserProvider before giving up
+        let finalResults = results;
+        if (roleFailed) {
+          const fallback = getWalletFallback();
+          if (fallback.contract && fallback.provider) {
+            console.warn(`[OpenTender] Attempt ${attempt}: Read-only provider failed for roles. Retrying through wallet BrowserProvider...`);
+            const fallbackResults = await executeQueryBatch(fallback.contract, fallback.provider, "WalletBrowserProvider");
+            if (isWatchdogAborted || roleRequestCounter.current !== currentRequestId) {
+              return;
+            }
+            finalResults = fallbackResults;
+          }
+        }
+
+        const [fBal, fReg, fAdm, fDept, fVerif, fBidder, fClaim] = finalResults;
+        const fRoleFailed = fReg?.__error || fAdm?.__error || fDept?.__error || fVerif?.__error || fBidder?.__error;
+
+        if (!fRoleFailed) {
+          // Success! Clear watchdog timer
+          if (roleWatchdogTimer.current) {
+            clearTimeout(roleWatchdogTimer.current);
+            roleWatchdogTimer.current = null;
+          }
+
+          // Handle balance: if read fails, show "..." and not 0.0000
+          if (!fBal?.__error && fBal !== undefined) {
+            setBalance(ethers.formatEther(fBal));
+          } else {
+            setBalance("...");
+          }
+
+          setRoles({
+            isRegistrar: Boolean(fReg || fAdm),
+            isDepartment: Boolean(fDept),
+            isVerifier: Boolean(fVerif),
+            isBidder: Boolean(fBidder?.registered),
+            isDebarred: Boolean(fBidder?.debarred),
+            isLoading: false,
+            isError: false,
+          });
+
+          if (!fClaim?.__error && fClaim !== undefined) {
+            setClaimableBalance(fClaim);
+          }
+          return;
+        }
+
+        // If attempt failed, wait briefly before retrying if attempts remain
         if (attempt < 3) {
           await new Promise((r) => setTimeout(r, 600));
         }
       }
-    }
 
-    // If all attempts failed and this is still the active request, keep "Checking role..."
-    if (roleRequestCounter.current === currentRequestId) {
-      console.warn("Role check error after retries:", lastError);
-      setRoles((prev) => ({ ...prev, isLoading: true }));
+      // If all 3 attempts failed across providers and still the active request:
+      if (roleRequestCounter.current === currentRequestId && !isWatchdogAborted) {
+        if (roleWatchdogTimer.current) {
+          clearTimeout(roleWatchdogTimer.current);
+          roleWatchdogTimer.current = null;
+        }
+        console.error("[OpenTender] All 3 role check attempts failed across providers. Displaying retry.");
+        setRoles((prev) => ({
+          ...prev,
+          isLoading: false,
+          isError: true,
+        }));
+        setBalance((prev) => (prev && prev !== "0" && prev !== "0.0000" ? prev : "..."));
+      }
+    } catch (err) {
+      console.error("[OpenTender] Unexpected error in checkAccountRoles:", err?.message || err);
+      if (roleRequestCounter.current === currentRequestId) {
+        if (roleWatchdogTimer.current) {
+          clearTimeout(roleWatchdogTimer.current);
+          roleWatchdogTimer.current = null;
+        }
+        setRoles((prev) => ({
+          ...prev,
+          isLoading: false,
+          isError: true,
+        }));
+        setBalance("...");
+      }
     }
-  }, []);
+  }, [readContract, activeWalletProvider]);
 
   // Connect Wallet (opens Multi-Wallet selection modal or connects directly)
   function handleOpenConnect() {
@@ -460,6 +672,7 @@ export default function App() {
       setAccount(addr);
       setSigner(s);
       setChainId(Number(network.chainId));
+      setBalance("...");
 
       if (Number(network.chainId) === 31337) {
         try {
@@ -485,6 +698,12 @@ export default function App() {
   }
 
   function disconnectWallet() {
+    if (roleWatchdogTimer.current) {
+      clearTimeout(roleWatchdogTimer.current);
+      roleWatchdogTimer.current = null;
+    }
+    roleRequestCounter.current++; // Invalidate pending role check
+
     // Attempt wallet permission revocation if supported by the provider
     if (activeWalletProvider && activeWalletProvider.request) {
       activeWalletProvider.request({
@@ -508,6 +727,7 @@ export default function App() {
       isBidder: false,
       isDebarred: false,
       isLoading: false,
+      isError: false,
     });
     try {
       localStorage.removeItem("opentender_wallet_name");
@@ -616,6 +836,9 @@ export default function App() {
           onConnect={handleOpenConnect}
           onDisconnect={disconnectWallet}
           onSwitchNetwork={switchNetwork}
+          onRetryRoleCheck={() => {
+            if (account) checkAccountRoles(account, signer);
+          }}
           isRpcOnline={!dataLoadError}
         />
 
