@@ -12,6 +12,12 @@ export const ERROR_TRANSLATIONS = {
   CommitPhaseClosed: "Submission Closed: The commitment window has ended for this tender.",
   RevealPhaseNotActive: "Phase Inactive: The reveal phase is not currently open.",
   RevealPhaseNotEnded: "Cannot Finalize: The reveal phase has not ended yet.",
+  AlreadyRevealed: "Duplicate Action: You have already opened your bid on this tender.",
+  NoCommitFound: "No Commitment: No sealed bid commitment was found for your wallet on this tender.",
+  InvalidTenderStatus: "Invalid Tender State: This tender is not in an active bidding or reveal phase.",
+  IncorrectBidBond: "Deposit Mismatch: The submitted bid deposit does not match the tender requirements.",
+  CancelWindowClosed: "Window Closed: Tender can no longer be cancelled after the commit deadline.",
+  TenderNotFound: "Tender Not Found: The specified tender does not exist on-chain.",
   EscrowWindowExpired: "Funding Expired: The Department's escrow funding window has elapsed.",
   EscrowWindowNotExpired: "Window Active: Escrow funding window is still active.",
   MilestoneNotPending: "Default Blocked: Contractor has already submitted milestone evidence and cannot be defaulted while awaiting verifier review.",
@@ -39,16 +45,31 @@ export const ERROR_TRANSLATIONS = {
 export function parseContractError(error, context = "general") {
   if (!error) return "An unknown error occurred.";
 
-  // 1. Try parsing custom error data with contract interface
+  // 1. Try extracting and parsing custom error data with contract interface
   try {
-    let data = error?.data || error?.info?.error?.data || error?.error?.data;
-    if (!data && typeof error?.message === "string") {
-      const match = error.message.match(/0x[0-9a-fA-F]{8,}/);
-      if (match) data = match[0];
-    }
-    if (!data && typeof error?.info?.error?.message === "string") {
-      const match = error.info.error.message.match(/0x[0-9a-fA-F]{8,}/);
-      if (match) data = match[0];
+    let data =
+      error?.data ||
+      error?.info?.error?.data ||
+      error?.info?.error?.error?.data ||
+      error?.error?.data;
+
+    if (!data) {
+      const candidates = [
+        error?.message,
+        error?.shortMessage,
+        error?.reason,
+        typeof error?.info?.error === "string" ? error.info.error : error?.info?.error?.message,
+        error?.error?.message,
+      ];
+      for (const text of candidates) {
+        if (typeof text === "string") {
+          const match = text.match(/0x[0-9a-fA-F]{8,}/);
+          if (match) {
+            data = match[0];
+            break;
+          }
+        }
+      }
     }
 
     if (typeof data === "string" && data.startsWith("0x")) {
@@ -66,7 +87,8 @@ export function parseContractError(error, context = "general") {
     error.message,
     error.shortMessage,
     error.reason,
-    error.info?.error?.message,
+    typeof error.info?.error === "string" ? error.info.error : error.info?.error?.message,
+    error.error?.message,
     error.toString?.(),
   ]
     .filter(Boolean)
@@ -119,9 +141,15 @@ export function parseContractError(error, context = "general") {
     return "Operation timed out. Please check your wallet or explorer before retrying.";
   }
 
-  // 9. Revert data missing / simulation failure
-  if (rawMsg.includes("missing revert data")) {
-    return "Transaction simulation failed. The bidding deadline may have passed or the contract conditions were not met.";
+  // 9. Revert data missing / simulation failure / could not coalesce error
+  if (
+    rawMsg.includes("could not coalesce error") ||
+    rawMsg.includes("missing revert data") ||
+    rawMsg.includes("call_exception") ||
+    error?.code === "CALL_EXCEPTION" ||
+    error?.code === "UNKNOWN_ERROR"
+  ) {
+    return "Transaction simulation failed on MST Testnet. The tender deadline may have expired or contract conditions were not met.";
   }
 
   // 10. Nonce or replacement error

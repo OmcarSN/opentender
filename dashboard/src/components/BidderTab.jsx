@@ -31,14 +31,17 @@ function formatMinutesSeconds(seconds) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function triggerDownloadBackup(tenderId, wallet, amount, salt, chainId) {
+function triggerDownloadBackup(tenderId, wallet, amount, salt, chainId, commitHash) {
   const shortWallet = wallet ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : "wallet";
   const backup = {
+    app: "OpenTender Sealed-Bid Backup",
     tenderId: Number(tenderId),
     wallet: wallet,
+    bidder: wallet,
     amount: amount.toString(),
     amountEth: amount.toString(), // backwards compatibility
     salt: salt,
+    commitHash: commitHash || undefined,
     chainId: Number(chainId),
     savedAt: new Date().toISOString(),
   };
@@ -70,7 +73,26 @@ export default function BidderTab({
   onConnectWallet,
 }) {
   const isWrongNetwork = chainId !== null && Number(chainId) !== CHAIN_ID;
-  const currentTime = latestBlockTimestamp || Math.floor(Date.now() / 1000);
+
+  // Live 1-second interval ticker for responsive phase countdowns and automatic state transitions
+  const [currentTime, setCurrentTime] = useState(() => (
+    latestBlockTimestamp && latestBlockTimestamp > 0
+      ? Number(latestBlockTimestamp)
+      : Math.floor(Date.now() / 1000)
+  ));
+
+  useEffect(() => {
+    if (latestBlockTimestamp && latestBlockTimestamp > 0) {
+      setCurrentTime(Number(latestBlockTimestamp));
+    }
+  }, [latestBlockTimestamp]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Wallet Balance & Registration Status
@@ -144,13 +166,20 @@ export default function BidderTab({
             try {
               const res = await contract.getCommitment(t.id, account);
               records[t.id] = {
-                committed: Boolean(res.committed),
-                revealed: Boolean(res.revealed),
-                bondClaimed: Boolean(res.bondClaimed),
-                commitTime: Number(res.commitTime),
+                commitHash: res.commitHash || res[0] || ethers.ZeroHash,
+                committed: Boolean(res.committed ?? res[2]),
+                revealed: Boolean(res.revealed ?? res[3]),
+                bondClaimed: Boolean(res.bondClaimed ?? res[4]),
+                commitTime: Number(res.commitTime ?? res[1] ?? 0),
               };
             } catch {
-              records[t.id] = { committed: false, revealed: false, bondClaimed: false, commitTime: 0 };
+              records[t.id] = {
+                commitHash: ethers.ZeroHash,
+                committed: false,
+                revealed: false,
+                bondClaimed: false,
+                commitTime: 0,
+              };
             }
           })
         );
@@ -164,6 +193,7 @@ export default function BidderTab({
               const n = records[k];
               return (
                 !p ||
+                p.commitHash !== n.commitHash ||
                 p.committed !== n.committed ||
                 p.revealed !== n.revealed ||
                 p.bondClaimed !== n.bondClaimed ||
@@ -353,7 +383,7 @@ export default function BidderTab({
       }
 
       // 2. Download backup JSON file named opentender-bid-<tenderId>-<short wallet>.json BEFORE sending tx
-      triggerDownloadBackup(selectedCommitTender.id, account, bidAmount, saltToUse, CHAIN_ID);
+      triggerDownloadBackup(selectedCommitTender.id, account, bidAmount, saltToUse, CHAIN_ID, commitHash);
       const downloadNoticeText = "Saved backup file. Keep it safe, you need it to open your bid.";
       setBackupDownloadNotice(downloadNoticeText);
 
@@ -496,6 +526,21 @@ export default function BidderTab({
           return;
         }
 
+        const backupWallet = data.wallet || data.bidder;
+        if (backupWallet && account && backupWallet.toLowerCase() !== account.toLowerCase()) {
+          setBackupFileNotice({
+            type: "warning",
+            message: `Notice: This backup file was created for wallet ${backupWallet.slice(0, 6)}...${backupWallet.slice(-4)}, but your connected wallet is ${account.slice(0, 6)}...${account.slice(-4)}. Make sure your active wallet matches.`,
+          });
+        }
+
+        if (data.chainId && Number(data.chainId) !== Number(CHAIN_ID)) {
+          setBackupFileNotice({
+            type: "warning",
+            message: `Notice: This backup file specifies Chain ID ${data.chainId}, but the connected network is ${CHAIN_NAME} (${CHAIN_ID}).`,
+          });
+        }
+
         setRevealAmount(String(amt));
         setRevealSalt(String(slt).trim());
 
@@ -504,15 +549,20 @@ export default function BidderTab({
         }
 
         setHasSavedBackup(true);
-        setBackupFileNotice({
-          type: "success",
-          message: `Backup file loaded successfully for Tender #${data.tenderId || "?"} (${amt} ${CURRENCY_SYMBOL}). Ready to open your bid.`,
-        });
+        setBackupFileNotice((prev) =>
+          prev?.type === "warning"
+            ? prev
+            : {
+                type: "success",
+                message: `Backup file loaded successfully for Tender #${data.tenderId || "?"} (${amt} ${CURRENCY_SYMBOL}). Ready to open your bid.`,
+              }
+        );
       } catch (err) {
         setBackupFileNotice({ type: "error", message: `Failed to read file: ${err.message}` });
       }
     };
     reader.readAsText(file);
+    e.target.value = "";
   }
 
   const selectedRevealTender = useMemo(() => {
@@ -520,6 +570,31 @@ export default function BidderTab({
   }, [tenders, revealTenderId]);
 
   const revealCommitment = selectedRevealTender ? userCommitments[selectedRevealTender.id] : null;
+
+  // Local commitment hash computation & matching against on-chain record
+  const isSaltFormatValid = Boolean(revealSalt && /^0x[0-9a-fA-F]{64}$/.test(revealSalt.trim()));
+  const isAmountValid = Boolean(revealAmount && !isNaN(parseFloat(revealAmount)) && parseFloat(revealAmount) > 0);
+
+  const localCommitmentHash = useMemo(() => {
+    if (!isSaltFormatValid || !isAmountValid || !account || !selectedRevealTender) return null;
+    try {
+      return computeCommitHash(
+        revealAmount,
+        revealSalt.trim(),
+        account,
+        selectedRevealTender.id,
+        CHAIN_ID
+      );
+    } catch {
+      return null;
+    }
+  }, [isSaltFormatValid, isAmountValid, account, selectedRevealTender, revealAmount, revealSalt]);
+
+  const onChainCommitHash = revealCommitment?.commitHash;
+  const isHashMatching = useMemo(() => {
+    if (!localCommitmentHash || !onChainCommitHash || onChainCommitHash === ethers.ZeroHash) return null;
+    return localCommitmentHash.toLowerCase() === onChainCommitHash.toLowerCase();
+  }, [localCommitmentHash, onChainCommitHash]);
 
   // Compute disabled reason for opening bid
   let revealDisabledReason = null;
@@ -531,17 +606,19 @@ export default function BidderTab({
     revealDisabledReason = "No bids to open right now.";
   } else if (!revealCommitment || !revealCommitment.committed) {
     revealDisabledReason = "You did not place a bid on this tender";
-  } else if (selectedRevealTender.commitDeadline && currentTime <= selectedRevealTender.commitDeadline) {
+  } else if (selectedRevealTender.commitDeadline && currentTime <= Number(selectedRevealTender.commitDeadline)) {
     const diff = Number(selectedRevealTender.commitDeadline) - Number(currentTime);
     revealDisabledReason = `Opening starts in ${formatMinutesSeconds(diff)}`;
-  } else if (selectedRevealTender.revealDeadline && currentTime > selectedRevealTender.revealDeadline) {
-    revealDisabledReason = "Opening is closed";
+  } else if (selectedRevealTender.revealDeadline && currentTime > Number(selectedRevealTender.revealDeadline)) {
+    revealDisabledReason = "Opening is closed (reveal deadline expired)";
   } else if (revealCommitment.revealed) {
     revealDisabledReason = "You already opened your bid on this tender";
-  } else if (!revealAmount || isNaN(parseFloat(revealAmount)) || parseFloat(revealAmount) <= 0) {
+  } else if (!revealAmount || !isAmountValid) {
     revealDisabledReason = "Enter the exact price from your backup file";
-  } else if (!revealSalt || !/^0x[0-9a-fA-F]{64}$/.test(revealSalt.trim())) {
+  } else if (!revealSalt || !isSaltFormatValid) {
     revealDisabledReason = "Enter the 32-byte secret code from your backup file";
+  } else if (isHashMatching === false) {
+    revealDisabledReason = "Credentials mismatch: Price or secret code does not match on-chain commitment";
   } else if (isSubmittingReveal) {
     revealDisabledReason = "Opening bid...";
   }
@@ -551,6 +628,63 @@ export default function BidderTab({
   async function handleOpenBid(e) {
     e.preventDefault();
     if (!canSubmitReveal || !selectedRevealTender || !signerContract) return;
+
+    // 1. Pre-flight phase check
+    if (selectedRevealTender.status !== 1) {
+      setNotification({
+        active: false,
+        title: "Tender Inactive",
+        error: "This tender is not open for bidding or reveals.",
+      });
+      return;
+    }
+
+    if (selectedRevealTender.commitDeadline && currentTime <= Number(selectedRevealTender.commitDeadline)) {
+      setNotification({
+        active: false,
+        title: "Reveal Phase Inactive",
+        error: `Submission phase is still active. Opening starts at ${new Date(Number(selectedRevealTender.commitDeadline) * 1000).toLocaleTimeString()}.`,
+      });
+      return;
+    }
+
+    if (selectedRevealTender.revealDeadline && currentTime > Number(selectedRevealTender.revealDeadline)) {
+      setNotification({
+        active: false,
+        title: "Reveal Phase Closed",
+        error: `The reveal deadline for Tender #${selectedRevealTender.id} has ended. Sealed bids can no longer be opened.`,
+      });
+      return;
+    }
+
+    // 2. Pre-flight commitment check
+    if (!revealCommitment || !revealCommitment.committed) {
+      setNotification({
+        active: false,
+        title: "No Commitment Found",
+        error: `No sealed bid commitment was found on-chain for wallet ${account} on Tender #${selectedRevealTender.id}.`,
+      });
+      return;
+    }
+
+    if (revealCommitment.revealed) {
+      setNotification({
+        active: false,
+        title: "Already Opened",
+        error: `Your sealed bid for Tender #${selectedRevealTender.id} has already been opened on-chain.`,
+      });
+      return;
+    }
+
+    // 3. Pre-flight hash verification
+    if (isHashMatching === false) {
+      setNotification({
+        active: false,
+        title: "Commitment Hash Mismatch",
+        error: "Reveal Rejected: Bid amount or secret salt does not match your original sealed commitment. Please check your backup file.",
+      });
+      return;
+    }
 
     try {
       setIsSubmittingReveal(true);
@@ -1213,18 +1347,34 @@ export default function BidderTab({
                 )}
               </div>
 
-              {!hasSavedBackup && (
-                <div className="backup-file-input-wrapper">
-                  <label htmlFor="backup-file-input" className="btn-file-upload">
-                    Upload your backup file
-                  </label>
-                  <input
-                    type="file"
-                    id="backup-file-input"
-                    accept=".json,application/json"
-                    onChange={handleBackupFileUpload}
-                    style={{ display: "none" }}
-                  />
+              <div className="backup-file-input-wrapper" style={{ marginTop: "0.4rem" }}>
+                <label htmlFor="backup-file-input" className="btn-file-upload" style={{ cursor: "pointer", fontSize: "0.82rem" }}>
+                  {hasSavedBackup ? "Upload different backup file" : "Upload your backup file"}
+                </label>
+                <input
+                  type="file"
+                  id="backup-file-input"
+                  accept=".json,application/json"
+                  onChange={handleBackupFileUpload}
+                  style={{ display: "none" }}
+                />
+              </div>
+
+              {onChainCommitHash && onChainCommitHash !== ethers.ZeroHash && (
+                <div style={{ marginTop: "0.5rem", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <span className="field-hint" style={{ margin: 0 }}>
+                    On-chain commitment: <code>{onChainCommitHash.slice(0, 10)}...{onChainCommitHash.slice(-8)}</code>
+                  </span>
+                  {isHashMatching === true && (
+                    <span className="badge badge-success" style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem" }}>
+                      ✓ Hash Verified
+                    </span>
+                  )}
+                  {isHashMatching === false && (
+                    <span className="badge badge-danger" style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem" }}>
+                      ⚠ Hash Mismatch
+                    </span>
+                  )}
                 </div>
               )}
 

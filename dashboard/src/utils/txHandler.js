@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { CHAIN_ID, CHAIN_NAME } from "../config";
+import { CHAIN_ID, CHAIN_NAME, getReadOnlyContract } from "../config";
 import { parseContractError } from "./errors";
 
 // Concurrency lock preventing double-submissions across the application
@@ -95,15 +95,33 @@ export async function executeTransaction({
     const callArgs = Object.keys(overrides).length > 0 ? [...args, overrides] : args;
 
     try {
-      if (signerContract[method].estimateGas) {
+      if (signerContract[method]?.estimateGas) {
         await signerContract[method].estimateGas(...callArgs);
       }
     } catch (estimateErr) {
-      const decodedReason = parseContractError(estimateErr, "transaction");
-      console.warn(`[OpenTender] Pre-flight estimation failed for ${method}:`, decodedReason);
-      // If estimation fails with a known contract custom error, reject early to save user gas
+      let decodedReason = parseContractError(estimateErr, "transaction");
+      console.warn(`[OpenTender] Pre-flight estimation failed on signer for ${method}:`, decodedReason);
+
+      // If generic error or simulation failed, run fallback staticCall against read-only provider to capture exact EVM revert bytes
+      if (!decodedReason || decodedReason.includes("simulation failed") || decodedReason.includes("reverted on-chain") || decodedReason.includes("coalesce")) {
+        try {
+          const readContract = getReadOnlyContract();
+          if (typeof readContract[method]?.staticCall === "function") {
+            await readContract[method].staticCall(...args, { from: account, ...overrides });
+          }
+        } catch (simErr) {
+          const simDecoded = parseContractError(simErr, "transaction");
+          if (simDecoded && !simDecoded.includes("simulation failed") && !simDecoded.includes("reverted on-chain")) {
+            decodedReason = simDecoded;
+          }
+        }
+      }
+
+      // If estimation fails with a decoded contract custom error, reject early to save user gas
       if (decodedReason && !decodedReason.includes("reverted on-chain") && !decodedReason.includes("simulation failed")) {
-        throw estimateErr;
+        const enhancedErr = new Error(decodedReason);
+        enhancedErr.reason = decodedReason;
+        throw enhancedErr;
       }
       // If error was just unsupported estimateGas on some networks, continue to wallet prompt
     }
@@ -180,7 +198,27 @@ export async function executeTransaction({
     };
   } catch (err) {
     console.error(`[OpenTender] Transaction ${method} failed:`, err?.message || err);
-    const userMsg = parseContractError(err, "transaction");
+    let userMsg = parseContractError(err, "transaction");
+
+    // If error message is still generic or simulation failed, run staticCall fallback to get decoded revert
+    if (!userMsg || userMsg.includes("simulation failed") || userMsg.includes("reverted on-chain") || userMsg.includes("coalesce")) {
+      try {
+        const readContract = getReadOnlyContract();
+        if (typeof readContract[method]?.staticCall === "function") {
+          await readContract[method].staticCall(...args, { from: account, ...overrides });
+        }
+      } catch (simErr) {
+        const simDecoded = parseContractError(simErr, "transaction");
+        if (simDecoded && !simDecoded.includes("simulation failed") && !simDecoded.includes("reverted on-chain")) {
+          userMsg = simDecoded;
+        }
+      }
+    }
+
+    if (!userMsg || userMsg.includes("coalesce")) {
+      userMsg = "Transaction could not be completed. The tender deadline may have expired or transaction conditions failed.";
+    }
+
     const finalErrorTitle = errorTitle || (title ? `${title} Failed` : "Transaction Failed");
 
     if (setNotification) {

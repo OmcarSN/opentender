@@ -907,6 +907,10 @@ export default function App() {
 
   useEffect(() => {
     loadContractData();
+    const interval = setInterval(() => {
+      loadContractData();
+    }, 20000);
+    return () => clearInterval(interval);
   }, [loadContractData]);
 
   const signerContract = signer ? getSignerContract(signer) : null;
