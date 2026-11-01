@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ethers } from "ethers";
 import {
   CONTRACT_ADDRESS,
@@ -54,6 +54,7 @@ export default function App() {
     isVerifier: false,
     isBidder: false,
     isDebarred: false,
+    isLoading: false,
   });
 
   const [showWalletModal, setShowWalletModal] = useState(() => {
@@ -359,41 +360,70 @@ export default function App() {
     }
   }, [selectedTenderId]);
 
-  // Check roles and balances for connected account
+  // Check roles and balances for connected account with retry, normalization, and stale result protection
+  const roleRequestCounter = useRef(0);
   const checkAccountRoles = useCallback(async (userAddress, userSigner) => {
     if (!userAddress) return;
+
+    let normAddress;
     try {
-      const contract = readContract;
-      const provider = contract.runner.provider;
+      normAddress = ethers.getAddress(userAddress);
+    } catch {
+      normAddress = userAddress;
+    }
 
-      const userBalance = await provider.getBalance(userAddress);
-      setBalance(ethers.formatEther(userBalance));
+    const currentRequestId = ++roleRequestCounter.current;
+    setRoles((prev) => ({ ...prev, isLoading: true }));
 
-      const REGISTRAR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REGISTRAR_ROLE"));
-      const DEPARTMENT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("DEPARTMENT_ROLE"));
-      const VERIFIER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("VERIFIER_ROLE"));
-      const DEFAULT_ADMIN = ethers.ZeroHash;
+    const contract = readContract;
+    const provider = contract.runner.provider;
 
-      const [isReg, isAdm, isDept, isVerif, bInfo, cBal] = await Promise.all([
-        contract.hasRole(REGISTRAR_ROLE, userAddress).catch(() => false),
-        contract.hasRole(DEFAULT_ADMIN, userAddress).catch(() => false),
-        contract.hasRole(DEPARTMENT_ROLE, userAddress).catch(() => false),
-        contract.hasRole(VERIFIER_ROLE, userAddress).catch(() => false),
-        contract.getBidderStatus(userAddress).catch(() => ({ registered: false, debarred: false })),
-        contract.claimableBalance(userAddress).catch(() => 0n),
-      ]);
+    const REGISTRAR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("REGISTRAR_ROLE"));
+    const DEPARTMENT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("DEPARTMENT_ROLE"));
+    const VERIFIER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("VERIFIER_ROLE"));
+    const DEFAULT_ADMIN = ethers.ZeroHash;
 
-      setRoles({
-        isRegistrar: isReg || isAdm,
-        isDepartment: isDept,
-        isVerifier: isVerif,
-        isBidder: bInfo.registered,
-        isDebarred: bInfo.debarred,
-      });
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const [userBalance, isReg, isAdm, isDept, isVerif, bInfo, cBal] = await Promise.all([
+          provider.getBalance(normAddress),
+          contract.hasRole(REGISTRAR_ROLE, normAddress),
+          contract.hasRole(DEFAULT_ADMIN, normAddress),
+          contract.hasRole(DEPARTMENT_ROLE, normAddress),
+          contract.hasRole(VERIFIER_ROLE, normAddress),
+          contract.getBidderStatus(normAddress),
+          contract.claimableBalance(normAddress).catch(() => 0n),
+        ]);
 
-      setClaimableBalance(cBal);
-    } catch (err) {
-      console.warn("Role check error:", err);
+        // Protect against stale results: if a newer request was dispatched, ignore this one
+        if (roleRequestCounter.current !== currentRequestId) {
+          return;
+        }
+
+        setBalance(ethers.formatEther(userBalance));
+        setRoles({
+          isRegistrar: Boolean(isReg || isAdm),
+          isDepartment: Boolean(isDept),
+          isVerifier: Boolean(isVerif),
+          isBidder: Boolean(bInfo.registered),
+          isDebarred: Boolean(bInfo.debarred),
+          isLoading: false,
+        });
+        setClaimableBalance(cBal);
+        return;
+      } catch (err) {
+        lastError = err;
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 600));
+        }
+      }
+    }
+
+    // If all attempts failed and this is still the active request, keep "Checking role..."
+    if (roleRequestCounter.current === currentRequestId) {
+      console.warn("Role check error after retries:", lastError);
+      setRoles((prev) => ({ ...prev, isLoading: true }));
     }
   }, []);
 
@@ -443,6 +473,10 @@ export default function App() {
       }
 
       await checkAccountRoles(addr, s);
+      setTimeout(() => {
+        checkAccountRoles(addr, s);
+      }, 2000);
+
       await loadContractData();
       setShowWalletModal(false);
     } catch (err) {
@@ -473,6 +507,7 @@ export default function App() {
       isVerifier: false,
       isBidder: false,
       isDebarred: false,
+      isLoading: false,
     });
     try {
       localStorage.removeItem("opentender_wallet_name");
@@ -560,7 +595,7 @@ export default function App() {
         }
       };
     }
-  }, [activeWalletProvider, activeWalletName]);
+  }, [activeWalletProvider, activeWalletName, checkAccountRoles]);
 
   useEffect(() => {
     loadContractData();

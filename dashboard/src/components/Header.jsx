@@ -31,15 +31,16 @@ export default function Header({
     };
   }, [showAccountMenu]);
 
-  // Plain words role label from existing role detection: Admin, Department, Verifier, Bidder, Debarred, or "Visitor (not registered)"
+  // Plain words role label priority: Admin, Department, Verifier, Bidder, Blocked bidder, Visitor (no role)
   const getRoleLabel = () => {
-    if (!roles) return "Visitor (not registered)";
+    if (roles?.isLoading) return "Checking role...";
+    if (!roles) return "Visitor (no role)";
     if (roles.isRegistrar) return "Admin";
     if (roles.isDepartment) return "Department";
     if (roles.isVerifier) return "Verifier";
-    if (roles.isDebarred) return "Debarred Bidder";
-    if (roles.isBidder) return "Bidder";
-    return "Visitor (not registered)";
+    if (roles.isBidder && !roles.isDebarred) return "Bidder";
+    if (roles.isBidder && roles.isDebarred) return "Blocked bidder";
+    return "Visitor (no role)";
   };
 
   const roleLabel = getRoleLabel();
@@ -115,7 +116,7 @@ export default function Header({
           {account ? (
             <div className="vita-wallet-wrapper" ref={menuRef}>
               <div className="vita-wallet-pill-group">
-                <span className={`wallet-role-badge ${roles?.isDebarred ? "badge-debarred" : ""}`}>
+                <span className={`wallet-role-badge ${roles?.isDebarred ? "badge-blocked" : roles?.isLoading ? "badge-loading" : ""}`}>
                   {roleLabel}
                 </span>
                 <span className="wallet-balance-amt font-mono">

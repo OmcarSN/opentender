@@ -278,7 +278,7 @@ describe('Error and Security Test Suite', () => {
     });
   });
 
-  it('correctly labels roles including Visitor (not registered), Debarred Bidder, and registered Bidder', () => {
+  it('correctly labels roles including Visitor (no role), Blocked bidder, and registered Bidder', () => {
     // 1. Unregistered visitor
     const { rerender } = render(
       <Header
@@ -293,9 +293,9 @@ describe('Error and Security Test Suite', () => {
         onSwitchNetwork={vi.fn()}
       />
     );
-    expect(screen.getByText('Visitor (not registered)')).toBeInTheDocument();
+    expect(screen.getByText('Visitor (no role)')).toBeInTheDocument();
 
-    // 2. Debarred bidder
+    // 2. Debarred / Blocked bidder
     rerender(
       <Header
         account={BIDDER1_ACCOUNT}
@@ -309,7 +309,7 @@ describe('Error and Security Test Suite', () => {
         onSwitchNetwork={vi.fn()}
       />
     );
-    expect(screen.getByText('Debarred Bidder')).toBeInTheDocument();
+    expect(screen.getByText('Blocked bidder')).toBeInTheDocument();
 
     // 3. Registered active bidder
     rerender(
@@ -326,5 +326,21 @@ describe('Error and Security Test Suite', () => {
       />
     );
     expect(screen.getByText('Bidder')).toBeInTheDocument();
+
+    // 4. Loading state shows "Checking role..."
+    rerender(
+      <Header
+        account={BIDDER1_ACCOUNT}
+        chainId={91562037}
+        roles={{ isLoading: true }}
+        balance="1.0"
+        activeTab="audit"
+        onTabChange={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+        onSwitchNetwork={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Checking role...')).toBeInTheDocument();
   });
 });

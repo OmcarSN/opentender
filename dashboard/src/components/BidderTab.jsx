@@ -91,7 +91,8 @@ export default function BidderTab({
       }
       try {
         const provider = getReadOnlyProvider();
-        const bal = await provider.getBalance(account);
+        const normAccount = ethers.getAddress(account);
+        const bal = await provider.getBalance(normAccount);
         if (isMounted) setWalletBalance(bal);
       } catch {
         if (isMounted) setWalletBalance(null);
@@ -105,7 +106,8 @@ export default function BidderTab({
       } else {
         try {
           const contract = getReadOnlyContract();
-          const status = await contract.getBidderStatus(account);
+          const normAccount = ethers.getAddress(account);
+          const status = await contract.getBidderStatus(normAccount);
           if (isMounted) {
             setIsBidderRegistered(Boolean(status.registered));
             setIsBidderDebarred(Boolean(status.debarred));
@@ -256,9 +258,9 @@ export default function BidderTab({
       commitDisabledReason = "Bidding has closed for this tender.";
     }
   } else if (isBidderRegistered === false) {
-    commitDisabledReason = "Your wallet is not registered as a bidder. Contact the tender administrator.";
+    commitDisabledReason = "Your wallet is not registered as a bidder";
   } else if (isBidderDebarred) {
-    commitDisabledReason = "Your wallet has been debarred from bidding on tenders.";
+    commitDisabledReason = "Your wallet is blocked from bidding";
   } else if (alreadyCommitted) {
     commitDisabledReason = "You already placed a bid on this tender";
   } else if (!hasEnoughDeposit) {
@@ -304,8 +306,8 @@ export default function BidderTab({
     if (isBidderDebarred) {
       setNotification({
         active: false,
-        title: "Wallet Debarred",
-        error: "This wallet is debarred from participating in tenders.",
+        title: "Wallet Blocked",
+        error: "Your wallet is blocked from bidding on tenders.",
       });
       return;
     }
@@ -940,10 +942,10 @@ export default function BidderTab({
         )}
 
         {account && isBidderDebarred && (
-          <div className="portal-alert alert-error" style={{ marginTop: "1rem" }}>
-            <span className="portal-alert-icon">✖</span>
+          <div className="portal-alert alert-warning" style={{ marginTop: "1rem" }}>
+            <span className="portal-alert-icon">⚠</span>
             <div className="portal-alert-body">
-              <strong>Wallet Debarred:</strong> Your wallet has been debarred from tender bidding by the registrar.
+              <strong>Wallet Blocked:</strong> Your wallet is blocked from bidding. Contact the tender administrator.
             </div>
           </div>
         )}
