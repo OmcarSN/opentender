@@ -171,11 +171,12 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
     if (!chosenProvider && fallbackProviderResolver) {
       chosenProvider = fallbackProviderResolver();
     }
-    if (!chosenProvider && typeof window !== "undefined") {
+    // Only permit universal fallback if user explicitly clicked generic "Browser Wallet"
+    if (!chosenProvider && id === "injected" && typeof window !== "undefined") {
       chosenProvider = window.ethereum;
     }
     try {
-      await onSelectWallet(chosenProvider, name);
+      await onSelectWallet(chosenProvider, name, id);
     } finally {
       setConnectingId(null);
     }
@@ -218,11 +219,13 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
             className={`web3-wallet-row ${connectingId === "bridgekey" ? "is-connecting" : ""}`}
             onClick={() =>
               handleSelect("bridgekey", "BridgeKey", () => {
+                if (typeof window === "undefined") return null;
                 return (
                   window.bridgekey?.ethereum ||
                   window.bridgekey ||
+                  window.bridgeKey ||
                   (window.ethereum?.providers || []).find((p) => p.isBridgeKey) ||
-                  window.ethereum
+                  (window.ethereum?.isBridgeKey ? window.ethereum : null)
                 );
               })
             }
@@ -259,9 +262,10 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
             className={`web3-wallet-row ${connectingId === "metamask" ? "is-connecting" : ""}`}
             onClick={() =>
               handleSelect("metamask", "MetaMask", () => {
+                if (typeof window === "undefined") return null;
                 return (
                   (window.ethereum?.providers || []).find((p) => p.isMetaMask && !p.isBridgeKey) ||
-                  window.ethereum
+                  (window.ethereum?.isMetaMask && !window.ethereum?.isBridgeKey ? window.ethereum : null)
                 );
               })
             }
@@ -295,9 +299,10 @@ export default function WalletModal({ isOpen, onClose, onSelectWallet }) {
             className={`web3-wallet-row ${connectingId === "coinbase" ? "is-connecting" : ""}`}
             onClick={() =>
               handleSelect("coinbase", "Coinbase Wallet", () => {
+                if (typeof window === "undefined") return null;
                 return (
                   (window.ethereum?.providers || []).find((p) => p.isCoinbaseWallet) ||
-                  window.ethereum
+                  (window.ethereum?.isCoinbaseWallet ? window.ethereum : null)
                 );
               })
             }

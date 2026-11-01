@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { ethers } from "ethers";
 import { CURRENCY_SYMBOL, CHAIN_ID, CHAIN_NAME, DEMO_VERIFIERS, getReadOnlyContract } from "../config";
 import { parseContractError } from "../utils/errors";
+import { executeTransaction } from "../utils/txHandler";
 
 function formatCountdown(targetTime, now) {
   if (!targetTime) return "None";
@@ -209,61 +210,67 @@ export default function OfficerTab({
       const titleText = projectTitle.trim();
       const documentHash = ethers.keccak256(ethers.toUtf8Bytes(titleText));
 
-      const tx = await signerContract.createTender(
-        ethers.parseEther(ceilingPrice),
-        ethers.parseEther(bidBond),
-        commitDeadline,
-        revealDeadline,
-        escrowWindow,
-        gracePeriod,
-        penaltyBps,
-        documentHash,
-        milestones,
-        verifierAddresses,
-        parsedThreshold
-      );
-
-      setNotification({ active: true, title: "Mining tender creation on-chain...", hash: tx.hash });
-      const receipt = await tx.wait();
-
-      let createdTenderId = null;
-      if (receipt && receipt.logs) {
-        for (const log of receipt.logs) {
-          try {
-            const parsed = signerContract.interface.parseLog(log);
-            if (parsed && parsed.name === "TenderCreated") {
-              createdTenderId = Number(parsed.args.tenderId);
-              break;
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-      if (!createdTenderId) {
-        try {
-          const readOnly = getReadOnlyContract();
-          createdTenderId = Number(await readOnly.tenderCount());
-        } catch {
-          createdTenderId = tenders.length + 1;
-        }
-      }
-
-      if (createdTenderId) {
-        localStorage.setItem(`opentender_title_${createdTenderId}`, titleText);
-      }
-      localStorage.setItem(`opentender_title_hash_${documentHash.toLowerCase()}`, titleText);
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Tender Published Successfully!",
-        success: `Tender #${createdTenderId || ""} ("${titleText}") published. Sealed bidding is active.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "createTender",
+        args: [
+          ethers.parseEther(ceilingPrice),
+          ethers.parseEther(bidBond),
+          commitDeadline,
+          revealDeadline,
+          escrowWindow,
+          gracePeriod,
+          penaltyBps,
+          documentHash,
+          milestones,
+          verifierAddresses,
+          parsedThreshold,
+        ],
+        chainId,
+        account,
+        title: "Publishing tender",
+        setNotification,
+        onRefresh,
       });
 
-      if (onRefresh) onRefresh();
+      if (result.success && result.receipt) {
+        let createdTenderId = null;
+        if (result.receipt.logs) {
+          for (const log of result.receipt.logs) {
+            try {
+              const parsed = signerContract.interface.parseLog(log);
+              if (parsed && parsed.name === "TenderCreated") {
+                createdTenderId = Number(parsed.args.tenderId);
+                break;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+        if (!createdTenderId) {
+          try {
+            const readOnly = getReadOnlyContract();
+            createdTenderId = Number(await readOnly.tenderCount());
+          } catch {
+            createdTenderId = tenders.length + 1;
+          }
+        }
+
+        if (createdTenderId) {
+          localStorage.setItem(`opentender_title_${createdTenderId}`, titleText);
+        }
+        localStorage.setItem(`opentender_title_hash_${documentHash.toLowerCase()}`, titleText);
+
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Tender Published Successfully!",
+          success: `Tender #${createdTenderId || ""} ("${titleText}") published. Sealed bidding is active.`,
+        });
+      }
     } catch (err) {
-      const msg = parseContractError(err);
+      const msg = parseContractError(err, "transaction");
       setNotification({ active: false, title: "Failed to publish tender", error: msg });
     } finally {
       setIsSubmitting(false);
@@ -354,25 +361,32 @@ export default function OfficerTab({
   }, [account, myTenders, latestBlockTimestamp]);
 
   async function handleFinalizeAward(tenderId) {
-    if (!signerContract || isSubmitting) return;
+    if (!signerContract || isSubmitting || isWrongNetwork) return;
     try {
       setSubmittingTenderId(tenderId);
       setIsSubmitting(true);
-      setNotification({ active: true, title: `Finalizing award for Tender #${tenderId}...` });
 
-      const tx = await signerContract.finalizeAward(tenderId);
-      setNotification({ active: true, title: "Confirming winner on-chain...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Winner Chosen!",
-        success: `Tender #${tenderId} award finalized. Awaiting escrow funding.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "finalizeAward",
+        args: [tenderId],
+        chainId,
+        account,
+        title: `Finalizing award for Tender #${tenderId}`,
+        setNotification,
+        onRefresh,
       });
-      if (onRefresh) onRefresh();
+
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Winner Chosen!",
+          success: `Tender #${tenderId} award finalized. Awaiting escrow funding.`,
+        });
+      }
     } catch (err) {
-      setNotification({ active: false, title: "Finalization Failed", error: parseContractError(err) });
+      setNotification({ active: false, title: "Finalization Failed", error: parseContractError(err, "transaction") });
     } finally {
       setIsSubmitting(false);
       setSubmittingTenderId(null);
@@ -380,25 +394,33 @@ export default function OfficerTab({
   }
 
   async function handleFundEscrow(tenderId, winningAmount) {
-    if (!signerContract || isSubmitting) return;
+    if (!signerContract || isSubmitting || isWrongNetwork) return;
     try {
       setSubmittingTenderId(tenderId);
       setIsSubmitting(true);
-      setNotification({ active: true, title: `Funding escrow for Tender #${tenderId}...` });
 
-      const tx = await signerContract.fundEscrow(tenderId, { value: winningAmount });
-      setNotification({ active: true, title: "Locking funds in escrow...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Escrow Funded!",
-        success: `Successfully funded ${ethers.formatEther(winningAmount)} ${CURRENCY_SYMBOL} into escrow. Work can now begin.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "fundEscrow",
+        args: [tenderId],
+        overrides: { value: winningAmount },
+        chainId,
+        account,
+        title: `Funding escrow for Tender #${tenderId}`,
+        setNotification,
+        onRefresh,
       });
-      if (onRefresh) onRefresh();
+
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Escrow Funded!",
+          success: `Successfully funded ${ethers.formatEther(winningAmount)} ${CURRENCY_SYMBOL} into escrow. Work can now begin.`,
+        });
+      }
     } catch (err) {
-      setNotification({ active: false, title: "Funding Failed", error: parseContractError(err) });
+      setNotification({ active: false, title: "Funding Failed", error: parseContractError(err, "transaction") });
     } finally {
       setIsSubmitting(false);
       setSubmittingTenderId(null);
@@ -406,25 +428,32 @@ export default function OfficerTab({
   }
 
   async function handleCancelUnfundedTender(tenderId) {
-    if (!signerContract || isSubmitting) return;
+    if (!signerContract || isSubmitting || isWrongNetwork) return;
     try {
       setSubmittingTenderId(tenderId);
       setIsSubmitting(true);
-      setNotification({ active: true, title: `Cancelling unfunded Tender #${tenderId}...` });
 
-      const tx = await signerContract.cancelUnfundedTender(tenderId);
-      setNotification({ active: true, title: "Confirming cancellation...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Tender Cancelled",
-        success: `Tender #${tenderId} was cancelled because escrow was not funded in time.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "cancelUnfundedTender",
+        args: [tenderId],
+        chainId,
+        account,
+        title: `Cancelling unfunded Tender #${tenderId}`,
+        setNotification,
+        onRefresh,
       });
-      if (onRefresh) onRefresh();
+
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Tender Cancelled",
+          success: `Tender #${tenderId} was cancelled because escrow was not funded in time.`,
+        });
+      }
     } catch (err) {
-      setNotification({ active: false, title: "Cancellation Failed", error: parseContractError(err) });
+      setNotification({ active: false, title: "Cancellation Failed", error: parseContractError(err, "transaction") });
     } finally {
       setIsSubmitting(false);
       setSubmittingTenderId(null);
@@ -432,25 +461,32 @@ export default function OfficerTab({
   }
 
   async function handleCancelTender(tenderId) {
-    if (!signerContract || isSubmitting) return;
+    if (!signerContract || isSubmitting || isWrongNetwork) return;
     try {
       setSubmittingTenderId(tenderId);
       setIsSubmitting(true);
-      setNotification({ active: true, title: `Cancelling Tender #${tenderId}...` });
 
-      const tx = await signerContract.cancelTender(tenderId, "Cancelled by department");
-      setNotification({ active: true, title: "Confirming cancellation...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Tender Cancelled",
-        success: `Tender #${tenderId} cancelled by department. Deposits unlocked for refund.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "cancelTender",
+        args: [tenderId, "Cancelled by department"],
+        chainId,
+        account,
+        title: `Cancelling Tender #${tenderId}`,
+        setNotification,
+        onRefresh,
       });
-      if (onRefresh) onRefresh();
+
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Tender Cancelled",
+          success: `Tender #${tenderId} cancelled by department. Deposits unlocked for refund.`,
+        });
+      }
     } catch (err) {
-      setNotification({ active: false, title: "Cancellation Failed", error: parseContractError(err) });
+      setNotification({ active: false, title: "Cancellation Failed", error: parseContractError(err, "transaction") });
     } finally {
       setIsSubmitting(false);
       setSubmittingTenderId(null);
@@ -458,25 +494,32 @@ export default function OfficerTab({
   }
 
   async function handleDeclareDefault(tenderId) {
-    if (!signerContract || isSubmitting) return;
+    if (!signerContract || isSubmitting || isWrongNetwork) return;
     try {
       setSubmittingTenderId(tenderId);
       setIsSubmitting(true);
-      setNotification({ active: true, title: `Declaring default for Tender #${tenderId}...` });
 
-      const tx = await signerContract.declareDefault(tenderId);
-      setNotification({ active: true, title: "Declaring default on-chain...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Default Declared",
-        success: `Contractor default recorded for Tender #${tenderId}. Remaining escrow recovered.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "declareDefault",
+        args: [tenderId],
+        chainId,
+        account,
+        title: `Declaring default for Tender #${tenderId}`,
+        setNotification,
+        onRefresh,
       });
-      if (onRefresh) onRefresh();
+
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Default Declared",
+          success: `Contractor default recorded for Tender #${tenderId}. Remaining escrow recovered.`,
+        });
+      }
     } catch (err) {
-      setNotification({ active: false, title: "Default Declaration Failed", error: parseContractError(err) });
+      setNotification({ active: false, title: "Default Declaration Failed", error: parseContractError(err, "transaction") });
     } finally {
       setIsSubmitting(false);
       setSubmittingTenderId(null);
@@ -764,28 +807,30 @@ export default function OfficerTab({
     try {
       setApprovingStageKey(stageKey);
       setIsSubmitting(true);
-      setNotification({
-        active: true,
-        title: `Approving Stage #${stageIndex + 1} for Tender #${tenderId}...`,
+
+      const result = await executeTransaction({
+        signerContract,
+        method: "approveMilestone",
+        args: [tenderId, stageIndex],
+        account,
+        title: `Approve Stage #${stageIndex + 1} for Tender #${tenderId}`,
+        setNotification,
+        onRefresh,
       });
 
-      const tx = await signerContract.approveMilestone(tenderId, stageIndex);
-      setNotification({ active: true, title: "Recording approval on-chain...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Stage Approved!",
-        success: `Your approval for Tender #${tenderId} (Stage #${stageIndex + 1}) was registered on-chain.`,
-      });
-
-      if (onRefresh) onRefresh();
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Stage Approved!",
+          success: `Your approval for Tender #${tenderId} (Stage #${stageIndex + 1}) was registered on-chain.`,
+        });
+      }
     } catch (err) {
       setNotification({
         active: false,
         title: "Approval Failed",
-        error: parseContractError(err),
+        error: parseContractError(err, "transaction"),
       });
     } finally {
       setIsSubmitting(false);
@@ -835,48 +880,76 @@ export default function OfficerTab({
       const targetAddress = participantAddress.trim();
 
       if (participantRole === "Department") {
-        setNotification({ active: true, title: `Granting Department role to ${targetAddress.slice(0, 6)}...` });
-        const tx = await signerContract.registerDepartment(targetAddress);
-        await tx.wait();
-        setNotification({
-          active: false,
-          title: "Department Registered",
-          success: `Granted Department role to ${targetAddress}`,
+        const result = await executeTransaction({
+          signerContract,
+          method: "registerDepartment",
+          args: [targetAddress],
+          account,
+          title: `Granting Department role to ${targetAddress.slice(0, 6)}...`,
+          setNotification,
+          onRefresh,
         });
-      } else if (participantRole === "Verifier") {
-        setNotification({ active: true, title: `Granting Verifier role to ${targetAddress.slice(0, 6)}...` });
-        const tx = await signerContract.registerVerifier(targetAddress);
-        await tx.wait();
-        setNotification({
-          active: false,
-          title: "Verifier Registered",
-          success: `Granted Verifier role to ${targetAddress}`,
-        });
-      } else if (participantRole === "Bidder") {
-        setNotification({ active: true, title: `Registering bidder ${targetAddress.slice(0, 6)}...` });
 
+        if (result.success) {
+          setNotification({
+            active: false,
+            hash: result.hash,
+            title: "Department Registered",
+            success: `Granted Department role to ${targetAddress}`,
+          });
+        }
+      } else if (participantRole === "Verifier") {
+        const result = await executeTransaction({
+          signerContract,
+          method: "registerVerifier",
+          args: [targetAddress],
+          account,
+          title: `Granting Verifier role to ${targetAddress.slice(0, 6)}...`,
+          setNotification,
+          onRefresh,
+        });
+
+        if (result.success) {
+          setNotification({
+            active: false,
+            hash: result.hash,
+            title: "Verifier Registered",
+            success: `Granted Verifier role to ${targetAddress}`,
+          });
+        }
+      } else if (participantRole === "Bidder") {
         // Both are hashed with keccak256 in the browser
         const groupId = ethers.keccak256(ethers.toUtf8Bytes(companyGroupName.trim()));
         const identityHash = ethers.keccak256(ethers.toUtf8Bytes(companyRegRef.trim()));
 
-        const tx = await signerContract.registerBidder(targetAddress, identityHash, groupId);
-        await tx.wait();
-        setNotification({
-          active: false,
-          title: "Bidder Registered",
-          success: `Registered bidder ${targetAddress} under group "${companyGroupName.trim()}".`,
+        const result = await executeTransaction({
+          signerContract,
+          method: "registerBidder",
+          args: [targetAddress, identityHash, groupId],
+          account,
+          title: `Registering bidder ${targetAddress.slice(0, 6)}...`,
+          setNotification,
+          onRefresh,
         });
+
+        if (result.success) {
+          setNotification({
+            active: false,
+            hash: result.hash,
+            title: "Bidder Registered",
+            success: `Registered bidder ${targetAddress} under group "${companyGroupName.trim()}".`,
+          });
+        }
       }
 
       setParticipantAddress("");
       setCompanyGroupName("");
       setCompanyRegRef("");
-      if (onRefresh) onRefresh();
     } catch (err) {
       setNotification({
         active: false,
         title: "Failed to Add Participant",
-        error: parseContractError(err),
+        error: parseContractError(err, "transaction"),
       });
     } finally {
       setIsSubmitting(false);
@@ -892,24 +965,32 @@ export default function OfficerTab({
       const targetAddress = blockBidderAddress.trim();
       const reason = blockBidderReason.trim();
 
-      setNotification({ active: true, title: `Debarring bidder ${targetAddress.slice(0, 6)}...` });
-      const tx = await signerContract.debarBidder(targetAddress, reason);
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        title: "Bidder Blocked",
-        success: `Wallet ${targetAddress} has been blocked from tender bidding. Reason: ${reason}`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "debarBidder",
+        args: [targetAddress, reason],
+        account,
+        title: `Debarring bidder ${targetAddress.slice(0, 6)}...`,
+        setNotification,
+        onRefresh,
       });
+
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Bidder Blocked",
+          success: `Wallet ${targetAddress} has been blocked from tender bidding. Reason: ${reason}`,
+        });
+      }
 
       setBlockBidderAddress("");
       setBlockBidderReason("");
-      if (onRefresh) onRefresh();
     } catch (err) {
       setNotification({
         active: false,
         title: "Failed to Block Bidder",
-        error: parseContractError(err),
+        error: parseContractError(err, "transaction"),
       });
     } finally {
       setIsSubmitting(false);
@@ -924,23 +1005,31 @@ export default function OfficerTab({
       setIsSubmitting(true);
       const targetAddress = reinstateBidderAddress.trim();
 
-      setNotification({ active: true, title: `Reinstating bidder ${targetAddress.slice(0, 6)}...` });
-      const tx = await signerContract.reinstateBidder(targetAddress);
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        title: "Bidder Reinstated",
-        success: `Wallet ${targetAddress} has been reinstated and can participate in tenders again.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "reinstateBidder",
+        args: [targetAddress],
+        account,
+        title: `Reinstating bidder ${targetAddress.slice(0, 6)}...`,
+        setNotification,
+        onRefresh,
       });
 
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Bidder Reinstated",
+          success: `Wallet ${targetAddress} has been reinstated and can participate in tenders again.`,
+        });
+      }
+
       setReinstateBidderAddress("");
-      if (onRefresh) onRefresh();
     } catch (err) {
       setNotification({
         active: false,
         title: "Failed to Reinstate Bidder",
-        error: parseContractError(err),
+        error: parseContractError(err, "transaction"),
       });
     } finally {
       setIsSubmitting(false);

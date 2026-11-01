@@ -6,6 +6,9 @@ import Header from '../components/Header';
 import BidderTab from '../components/BidderTab';
 import OfficerTab from '../components/OfficerTab';
 import PublicAuditTab from '../components/PublicAuditTab';
+import WalletModal from '../components/WalletModal';
+import { parseContractError } from '../utils/errors';
+import { executeTransaction } from '../utils/txHandler';
 import {
   mockTenders,
   createMockContract,
@@ -342,5 +345,130 @@ describe('Error and Security Test Suite', () => {
       />
     );
     expect(screen.getByText('Checking role...')).toBeInTheDocument();
+  });
+
+  it('differentiates connection vs transaction rejections in parseContractError', () => {
+    const userCancel = new Error('User rejected the request.');
+    userCancel.code = 4001;
+
+    // Connection context
+    const connMsg = parseContractError(userCancel, 'connection');
+    expect(connMsg).toBe('Connection request was cancelled in your wallet.');
+
+    // Transaction context
+    const txMsg = parseContractError(userCancel, 'transaction');
+    expect(txMsg).toBe('Transaction signature was cancelled in your wallet.');
+
+    // Wallet locked
+    const lockedErr = new Error('Unauthorized');
+    lockedErr.code = 4100;
+    expect(parseContractError(lockedErr)).toContain('locked');
+
+    // Request already pending
+    const pendingErr = new Error('Request already pending');
+    pendingErr.code = -32002;
+    expect(parseContractError(pendingErr)).toContain('already pending');
+  });
+
+  it('enforces transaction mutex and blocks duplicate concurrent transactions', async () => {
+    const mockContract = createMockContract();
+    let resolveTx;
+    mockContract.commitBid = vi.fn().mockReturnValue(
+      new Promise((res) => {
+        resolveTx = res;
+      })
+    );
+
+    const setNotif = vi.fn();
+    // Start first transaction
+    const tx1Promise = executeTransaction({
+      signerContract: mockContract,
+      method: 'commitBid',
+      args: [1, '0xabc'],
+      account: BIDDER1_ACCOUNT,
+      chainId: 91562037,
+      title: 'First Transaction',
+      setNotification: setNotif,
+    });
+
+    // Attempt second transaction while first is pending
+    const tx2Result = await executeTransaction({
+      signerContract: mockContract,
+      method: 'commitBid',
+      args: [1, '0xdef'],
+      account: BIDDER1_ACCOUNT,
+      chainId: 91562037,
+      title: 'Second Transaction',
+      setNotification: setNotif,
+    });
+
+    expect(tx2Result.success).toBe(false);
+    expect(tx2Result.error).toContain('Another transaction is currently awaiting confirmation');
+
+    // Clean up first tx
+    resolveTx({ hash: '0xhash', wait: vi.fn().mockResolvedValue({ status: 1, blockNumber: 100 }) });
+    await tx1Promise;
+  });
+
+  it('validates chainId and blocks transactions when wallet is on wrong network', async () => {
+    const mockContract = createMockContract();
+    const setNotif = vi.fn();
+
+    const result = await executeTransaction({
+      signerContract: mockContract,
+      method: 'commitBid',
+      args: [1, '0xabc'],
+      account: BIDDER1_ACCOUNT,
+      chainId: 1, // Ethereum mainnet instead of MST Testnet (91562037)
+      title: 'Wrong Network Tx',
+      setNotification: setNotif,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/wrong network/i);
+  });
+
+  it('rejects transaction when receipt status is 0 (reverted on-chain)', async () => {
+    const mockContract = createMockContract();
+    mockContract.commitBid = vi.fn().mockResolvedValue({
+      hash: '0xreverted_tx',
+      wait: vi.fn().mockResolvedValue({ status: 0, blockNumber: 101 }),
+    });
+
+    const setNotif = vi.fn();
+    const result = await executeTransaction({
+      signerContract: mockContract,
+      method: 'commitBid',
+      args: [1, '0xabc'],
+      account: BIDDER1_ACCOUNT,
+      chainId: 91562037,
+      title: 'Reverted Tx',
+      setNotification: setNotif,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('reverted on-chain');
+  });
+
+  it('does not silently fall back to MetaMask when BridgeKey is selected and not installed', async () => {
+    // Simulate window where only MetaMask is installed, but NOT BridgeKey
+    window.ethereum = { isMetaMask: true, isBridgeKey: false };
+    delete window.bridgekey;
+    delete window.bridgeKey;
+
+    const onSelect = vi.fn();
+    render(
+      <WalletModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSelectWallet={onSelect}
+      />
+    );
+
+    const bridgeKeyBtn = screen.getByRole('button', { name: /BridgeKey/i });
+    await userEvent.click(bridgeKeyBtn);
+
+    // Verify onSelectWallet was called with null provider for BridgeKey, NOT window.ethereum
+    expect(onSelect).toHaveBeenCalledWith(null, 'BridgeKey', 'bridgekey');
   });
 });

@@ -9,6 +9,7 @@ import {
 } from "../config";
 import { generateRandomSalt, computeCommitHash } from "../utils/crypto";
 import { parseContractError } from "../utils/errors";
+import { executeTransaction } from "../utils/txHandler";
 
 function formatTimeLeft(deadline, currentBlockTime) {
   if (!deadline) return "None";
@@ -361,30 +362,30 @@ export default function BidderTab({
         title: `Placing sealed bid for Tender #${selectedCommitTender.id}...`,
       });
 
-      // 3. Send commitBid with value = deposit
-      const tx = await signerContract.commitBid(selectedCommitTender.id, commitHash, {
-        value: selectedCommitTender.bidBond,
+      // 3. Send commitBid with value = deposit via centralized executeTransaction
+      const result = await executeTransaction({
+        signerContract,
+        method: "commitBid",
+        args: [selectedCommitTender.id, commitHash],
+        overrides: { value: selectedCommitTender.bidBond },
+        chainId,
+        account,
+        title: "Placing sealed bid",
+        errorTitle: "Failed to place sealed bid",
+        setNotification,
+        onRefresh,
       });
 
-      setNotification({
-        active: true,
-        title: "Waiting for block confirmation...",
-        hash: tx.hash,
-      });
-
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Sealed Bid Placed Successfully!",
-        success: `Your sealed bid was recorded on-chain. Deposit of ${depositFormatted} ${CURRENCY_SYMBOL} is locked in escrow. ${downloadNoticeText}`,
-      });
-
-      // Refresh data
-      if (onRefresh) onRefresh();
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Sealed Bid Placed Successfully!",
+          success: `Your sealed bid was recorded on-chain. Deposit of ${depositFormatted} ${CURRENCY_SYMBOL} is locked in escrow. ${downloadNoticeText}`,
+        });
+      }
     } catch (err) {
-      const msg = parseContractError(err);
+      const msg = parseContractError(err, "transaction");
       setNotification({ active: false, title: "Failed to place sealed bid", error: msg });
     } finally {
       setIsSubmittingCommit(false);
@@ -556,25 +557,28 @@ export default function BidderTab({
       setNotification({ active: true, title: `Opening bid for Tender #${selectedRevealTender.id}...` });
 
       const amountWei = ethers.parseEther(revealAmount.toString());
-      const tx = await signerContract.revealBid(
-        selectedRevealTender.id,
-        amountWei,
-        revealSalt.trim()
-      );
-
-      setNotification({ active: true, title: "Waiting for block confirmation...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Bid Opened On-Chain!",
-        success: `Successfully opened your bid of ${revealAmount} ${CURRENCY_SYMBOL}. Your price is registered for evaluation.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "revealBid",
+        args: [selectedRevealTender.id, amountWei, revealSalt.trim()],
+        chainId,
+        account,
+        title: "Opening bid",
+        errorTitle: "Failed to open bid",
+        setNotification,
+        onRefresh,
       });
 
-      if (onRefresh) onRefresh();
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Bid Opened On-Chain!",
+          success: `Successfully opened your bid of ${revealAmount} ${CURRENCY_SYMBOL}. Your price is registered for evaluation.`,
+        });
+      }
     } catch (err) {
-      const msg = parseContractError(err);
+      const msg = parseContractError(err, "transaction");
       setNotification({ active: false, title: "Failed to open bid", error: msg });
     } finally {
       setIsSubmittingReveal(false);
@@ -699,32 +703,32 @@ export default function BidderTab({
           ? text
           : ethers.keccak256(ethers.toUtf8Bytes(text));
 
-      setNotification({
-        active: true,
-        title: `Submitting proof of work for Milestone #${autoMilestoneIndex + 1}...`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "submitMilestone",
+        args: [selectedFundedTender.id, autoMilestoneIndex, evidenceHash],
+        chainId,
+        account,
+        title: "Submitting milestone proof",
+        errorTitle: "Failed to submit milestone proof",
+        setNotification,
+        onRefresh: async () => {
+          await fetchFundedMilestones();
+          if (onRefresh) await onRefresh();
+        },
       });
 
-      const tx = await signerContract.submitMilestone(
-        selectedFundedTender.id,
-        autoMilestoneIndex,
-        evidenceHash
-      );
-
-      setNotification({ active: true, title: "Confirming submission on-chain...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Proof of Work Submitted!",
-        success: `Proof registered for Milestone #${autoMilestoneIndex + 1}. Awaiting verifier sign-off.`,
-      });
-
-      setProofText("");
-      await fetchFundedMilestones();
-      if (onRefresh) onRefresh();
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Proof of Work Submitted!",
+          success: `Proof registered for Milestone #${autoMilestoneIndex + 1}. Awaiting verifier sign-off.`,
+        });
+        setProofText("");
+      }
     } catch (err) {
-      const msg = parseContractError(err);
+      const msg = parseContractError(err, "transaction");
       setNotification({ active: false, title: "Submission Failed", error: msg });
     } finally {
       setIsSubmittingProof(false);
@@ -852,22 +856,28 @@ export default function BidderTab({
 
     try {
       setIsSubmittingWithdraw(true);
-      setNotification({ active: true, title: "Withdrawing money waiting for you..." });
-
-      const tx = await signerContract.withdrawPullBalance();
-      setNotification({ active: true, title: "Confirming withdrawal...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Withdrawal Complete",
-        success: `Transferred ${ethers.formatEther(claimableBalance)} ${CURRENCY_SYMBOL} directly to your wallet.`,
+      const result = await executeTransaction({
+        signerContract,
+        method: "withdrawPullBalance",
+        args: [],
+        chainId,
+        account,
+        title: "Withdrawing balance",
+        errorTitle: "Withdrawal Failed",
+        setNotification,
+        onRefresh,
       });
 
-      if (onRefresh) onRefresh();
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Withdrawal Complete",
+          success: `Transferred ${ethers.formatEther(claimableBalance)} ${CURRENCY_SYMBOL} directly to your wallet.`,
+        });
+      }
     } catch (err) {
-      const msg = parseContractError(err);
+      const msg = parseContractError(err, "transaction");
       setNotification({ active: false, title: "Withdrawal Failed", error: msg });
     } finally {
       setIsSubmittingWithdraw(false);
@@ -879,32 +889,36 @@ export default function BidderTab({
 
     try {
       setRefundingTenderId(tenderId);
-      setNotification({ active: true, title: `Claiming deposit for Tender #${tenderId}...` });
-
-      const tx = await signerContract.claimBondRefund(tenderId);
-      setNotification({ active: true, title: "Confirming deposit return...", hash: tx.hash });
-      await tx.wait();
-
-      setNotification({
-        active: false,
-        hash: tx.hash,
-        title: "Deposit Returned!",
-        success: "Your deposit has been returned directly to your wallet.",
+      const result = await executeTransaction({
+        signerContract,
+        method: "claimBondRefund",
+        args: [tenderId],
+        chainId,
+        account,
+        title: `Claiming deposit for Tender #${tenderId}`,
+        errorTitle: "Failed to claim deposit refund",
+        setNotification,
+        onRefresh: async () => {
+          setRefundableTenders((prev) => prev.filter((t) => Number(t.id) !== Number(tenderId)));
+          setUserCommitments((prev) => ({
+            ...prev,
+            [tenderId]: { ...(prev[tenderId] || {}), bondClaimed: true },
+          }));
+          setRefundCheckTrigger((n) => n + 1);
+          if (onRefresh) await onRefresh();
+        },
       });
 
-      // Instantly update local state so UI updates without waiting for re-fetch
-      setRefundableTenders((prev) => prev.filter((t) => Number(t.id) !== Number(tenderId)));
-      setUserCommitments((prev) => ({
-        ...prev,
-        [tenderId]: { ...(prev[tenderId] || {}), bondClaimed: true },
-      }));
-
-      // Trigger fresh eligibility check
-      setRefundCheckTrigger((n) => n + 1);
-
-      if (onRefresh) onRefresh();
+      if (result.success) {
+        setNotification({
+          active: false,
+          hash: result.hash,
+          title: "Deposit Returned!",
+          success: "Your deposit has been returned directly to your wallet.",
+        });
+      }
     } catch (err) {
-      const msg = parseContractError(err);
+      const msg = parseContractError(err, "transaction");
       setNotification({ active: false, title: "Failed to get deposit back", error: msg });
     } finally {
       setRefundingTenderId(null);

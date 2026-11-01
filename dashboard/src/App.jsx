@@ -24,22 +24,35 @@ import { parseContractError } from "./utils/errors";
 function getWalletProviderByName(name) {
   if (typeof window === "undefined") return null;
   const n = (name || "").toLowerCase();
-  if (n === "bridgekey" && (window.bridgekey || window.bridgeKey)) {
-    return window.bridgekey?.ethereum || window.bridgekey || window.bridgeKey;
-  }
-  if (window.ethereum && Array.isArray(window.ethereum.providers)) {
-    if (n === "bridgekey") {
+  if (n === "bridgekey") {
+    if (window.bridgekey || window.bridgeKey) {
+      return window.bridgekey?.ethereum || window.bridgekey || window.bridgeKey;
+    }
+    if (window.ethereum?.isBridgeKey) return window.ethereum;
+    if (window.ethereum && Array.isArray(window.ethereum.providers)) {
       const p = window.ethereum.providers.find((x) => x.isBridgeKey);
       if (p) return p;
     }
-    if (n === "metamask") {
+    return null; // Never silently fall back to MetaMask when user asked for BridgeKey!
+  }
+  if (n === "metamask") {
+    if (window.ethereum && Array.isArray(window.ethereum.providers)) {
       const p = window.ethereum.providers.find((x) => x.isMetaMask && !x.isBridgeKey);
       if (p) return p;
     }
-    if (n === "coinbase" || n.includes("coinbase")) {
+    if (window.ethereum?.isMetaMask && !window.ethereum?.isBridgeKey) return window.ethereum;
+    return null;
+  }
+  if (n === "coinbase" || n.includes("coinbase")) {
+    if (window.ethereum && Array.isArray(window.ethereum.providers)) {
       const p = window.ethereum.providers.find((x) => x.isCoinbaseWallet);
       if (p) return p;
     }
+    if (window.ethereum?.isCoinbaseWallet) return window.ethereum;
+    return null;
+  }
+  if (n === "injected" || n === "browser wallet") {
+    return window.ethereum || null;
   }
   return window.ethereum || null;
 }
@@ -644,16 +657,27 @@ export default function App() {
     setShowWalletModal(true);
   }
 
-  async function connectWalletWithProvider(chosenProvider, walletName = "") {
-    const rawProvider = chosenProvider || activeWalletProvider || window.ethereum;
+  const isConnectingRef = useRef(false);
+
+  async function connectWalletWithProvider(chosenProvider, walletName = "", walletId = "") {
+    if (isConnectingRef.current) {
+      console.warn("[OpenTender] Connection operation already in progress, ignoring duplicate trigger.");
+      return;
+    }
+
+    const resolvedName = walletName || (walletId === "bridgekey" ? "BridgeKey" : "Wallet");
+    const rawProvider = chosenProvider || (walletName ? getWalletProviderByName(walletName) : null) || activeWalletProvider;
+
     if (!rawProvider) {
       setNotification({
         active: false,
-        title: "No Wallet Detected",
-        error: "Please install or unlock BridgeKey, MetaMask, or a compatible Web3 browser extension."
+        title: `${resolvedName} Not Detected`,
+        error: `${resolvedName} extension was not found in this browser. Please install or enable it to continue.`
       });
       return;
     }
+
+    isConnectingRef.current = true;
     try {
       if (rawProvider.request) {
         await rawProvider.request({ method: "eth_requestAccounts" });
@@ -664,9 +688,9 @@ export default function App() {
       const network = await browserProvider.getNetwork();
 
       setActiveWalletProvider(rawProvider);
-      if (walletName) {
-        setActiveWalletName(walletName);
-        try { localStorage.setItem("opentender_wallet_name", walletName); } catch {}
+      if (resolvedName) {
+        setActiveWalletName(resolvedName);
+        try { localStorage.setItem("opentender_wallet_name", resolvedName); } catch {}
       }
       try { localStorage.removeItem("opentender_disconnected"); } catch {}
       setAccount(addr);
@@ -686,14 +710,13 @@ export default function App() {
       }
 
       await checkAccountRoles(addr, s);
-      setTimeout(() => {
-        checkAccountRoles(addr, s);
-      }, 2000);
-
       await loadContractData();
       setShowWalletModal(false);
     } catch (err) {
-      setNotification({ active: false, title: "Connection Failed", error: parseContractError(err) });
+      console.error("[OpenTender] Connection error:", err);
+      setNotification({ active: false, title: "Connection Failed", error: parseContractError(err, "connection") });
+    } finally {
+      isConnectingRef.current = false;
     }
   }
 
@@ -735,7 +758,7 @@ export default function App() {
     } catch {}
   }
 
-  // Add / Switch Network
+  // Add / Switch Network with immediate in-place verification (no disruptive page reloads)
   async function switchNetwork() {
     const provider = activeWalletProvider || window.ethereum;
     if (!provider || !provider.request) return;
@@ -746,24 +769,62 @@ export default function App() {
         params: [{ chainId: hexChainId }],
       });
     } catch (switchError) {
-      if (switchError.code === 4902) {
-        await provider.request({
-          method: "wallet_addEthereumChain",
-          params: [
-            {
-              chainId: hexChainId,
-              chainName: CHAIN_NAME,
-              rpcUrls: [RPC_URL],
-              nativeCurrency: {
-                name: CURRENCY_SYMBOL,
-                symbol: CURRENCY_SYMBOL,
-                decimals: 18,
+      const errCode = switchError?.code || switchError?.data?.originalError?.code;
+      const errMsg = (switchError?.message || "").toLowerCase();
+      if (errCode === 4902 || errMsg.includes("unrecognized") || errMsg.includes("not found") || errMsg.includes("add")) {
+        try {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: hexChainId,
+                chainName: CHAIN_NAME,
+                rpcUrls: [RPC_URL],
+                nativeCurrency: {
+                  name: CURRENCY_SYMBOL,
+                  symbol: CURRENCY_SYMBOL,
+                  decimals: 18,
+                },
+                blockExplorerUrls: EXPLORER_URL ? [EXPLORER_URL] : null,
               },
-              blockExplorerUrls: EXPLORER_URL ? [EXPLORER_URL] : null,
-            },
-          ],
+            ],
+          });
+        } catch (addError) {
+          setNotification({
+            active: false,
+            title: "Network Switch Failed",
+            error: parseContractError(addError, "general"),
+          });
+          return;
+        }
+      } else {
+        setNotification({
+          active: false,
+          title: "Network Switch Rejected",
+          error: parseContractError(switchError, "general"),
+        });
+        return;
+      }
+    }
+
+    // Verify network immediately post-switch without reloading page
+    try {
+      const browserProvider = new ethers.BrowserProvider(provider);
+      const net = await browserProvider.getNetwork();
+      const newChainId = Number(net.chainId);
+      setChainId(newChainId);
+      if (newChainId === Number(CHAIN_ID) && account) {
+        const newSigner = await browserProvider.getSigner();
+        setSigner(newSigner);
+        checkAccountRoles(account, newSigner);
+        setNotification({
+          active: false,
+          title: "Network Switched",
+          success: `Connected to ${CHAIN_NAME}.`,
         });
       }
+    } catch (e) {
+      console.warn("[OpenTender] Post-switch check notice:", e);
     }
   }
 
@@ -778,10 +839,10 @@ export default function App() {
       isExplicitlyDisconnected = localStorage.getItem("opentender_disconnected") === "true";
     } catch {}
 
-    if (!account && !isExplicitlyDisconnected && p.request) {
+    if (!account && !isExplicitlyDisconnected && p.request && !isConnectingRef.current) {
       p.request({ method: "eth_accounts" })
         .then((accounts) => {
-          if (accounts && accounts.length > 0) {
+          if (accounts && accounts.length > 0 && !isConnectingRef.current) {
             connectWalletWithProvider(p, activeWalletName);
           }
         })
@@ -796,8 +857,35 @@ export default function App() {
           disconnectWallet();
         }
       };
-      const handleChain = () => {
-        window.location.reload();
+      const handleChain = (newChainHex) => {
+        let newChainNum = null;
+        try {
+          if (typeof newChainHex === "string") {
+            newChainNum = parseInt(newChainHex, 16);
+          }
+        } catch {}
+        if (!newChainNum && p) {
+          const bp = new ethers.BrowserProvider(p);
+          bp.getNetwork().then((net) => {
+            const cid = Number(net.chainId);
+            setChainId(cid);
+            if (cid === Number(CHAIN_ID) && account) {
+              bp.getSigner().then((s) => {
+                setSigner(s);
+                checkAccountRoles(account, s);
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+          return;
+        }
+        setChainId(newChainNum);
+        if (newChainNum === Number(CHAIN_ID) && account && p) {
+          const bp = new ethers.BrowserProvider(p);
+          bp.getSigner().then((s) => {
+            setSigner(s);
+            checkAccountRoles(account, s);
+          }).catch(() => {});
+        }
       };
       const handleDisconnect = () => {
         disconnectWallet();
@@ -815,7 +903,7 @@ export default function App() {
         }
       };
     }
-  }, [activeWalletProvider, activeWalletName, checkAccountRoles]);
+  }, [activeWalletProvider, activeWalletName, checkAccountRoles, account]);
 
   useEffect(() => {
     loadContractData();
