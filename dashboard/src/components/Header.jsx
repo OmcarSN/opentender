@@ -31,15 +31,15 @@ export default function Header({
     };
   }, [showAccountMenu]);
 
-  // Plain words role label from existing role detection: Admin, Department, Verifier, Bidder, Debarred, or "Visitor (no role)"
+  // Plain words role label from existing role detection: Admin, Department, Verifier, Bidder, Debarred, or "Visitor (not registered)"
   const getRoleLabel = () => {
-    if (!roles) return "Visitor (no role)";
+    if (!roles) return "Visitor (not registered)";
     if (roles.isRegistrar) return "Admin";
     if (roles.isDepartment) return "Department";
     if (roles.isVerifier) return "Verifier";
     if (roles.isDebarred) return "Debarred Bidder";
     if (roles.isBidder) return "Bidder";
-    return "Visitor (no role)";
+    return "Visitor (not registered)";
   };
 
   const roleLabel = getRoleLabel();

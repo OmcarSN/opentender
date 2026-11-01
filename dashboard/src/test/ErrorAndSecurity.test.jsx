@@ -277,4 +277,54 @@ describe('Error and Security Test Suite', () => {
       wait: vi.fn().mockResolvedValue({ status: 1 }),
     });
   });
+
+  it('correctly labels roles including Visitor (not registered), Debarred Bidder, and registered Bidder', () => {
+    // 1. Unregistered visitor
+    const { rerender } = render(
+      <Header
+        account={VISITOR_ACCOUNT}
+        chainId={91562037}
+        roles={{ isBidder: false, isRegistrar: false, isDepartment: false, isVerifier: false, isDebarred: false }}
+        balance="1.0"
+        activeTab="audit"
+        onTabChange={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+        onSwitchNetwork={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Visitor (not registered)')).toBeInTheDocument();
+
+    // 2. Debarred bidder
+    rerender(
+      <Header
+        account={BIDDER1_ACCOUNT}
+        chainId={91562037}
+        roles={{ isBidder: true, isRegistrar: false, isDepartment: false, isVerifier: false, isDebarred: true }}
+        balance="1.0"
+        activeTab="audit"
+        onTabChange={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+        onSwitchNetwork={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Debarred Bidder')).toBeInTheDocument();
+
+    // 3. Registered active bidder
+    rerender(
+      <Header
+        account={BIDDER1_ACCOUNT}
+        chainId={91562037}
+        roles={{ isBidder: true, isRegistrar: false, isDepartment: false, isVerifier: false, isDebarred: false }}
+        balance="1.0"
+        activeTab="audit"
+        onTabChange={vi.fn()}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+        onSwitchNetwork={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Bidder')).toBeInTheDocument();
+  });
 });
